@@ -1,19 +1,21 @@
 #!/bin/sh
-# Endfield Cloud — Firefox/Gecko shell launcher (Flatpak or native)
-# 项目: projects/endfield-cloud-steamdeck/firefox
-# 用途: 作为 Steam「非 Steam 游戏」快捷方式的 Target(游戏模式 gamescope 可用),
-#       也可在桌面模式(KWin Wayland)直接运行。
+# 云·终末地 · Firefox/Gecko 外壳启动器（Flatpak 或 native Firefox）
+#
+# 用途: 作为 Steam「非 Steam 游戏」快捷方式的 Target（游戏模式 gamescope 可用），
+#       也可在桌面模式直接运行。
 #
 # 用法:
 #   launch-firefox.sh [--url=URL] [--window-size=WxH] [--fullscreen] [--windowed]
 #                     [--window-mode=auto|fullscreen|windowed]
 #   环境变量:
-#     DRY_RUN=1                 只打印最终命令,不执行
+#     DRY_RUN=1                 只打印最终命令，不执行
 #     ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制指定渲染后端
-#     ENDFIELD_LOG=1            写日志(默认: 游戏模式(gamescope)下自动写,桌面模式不打)
+#     ENDFIELD_TAB_GUARD=0      关闭标签页守护（同时不给 Firefox 加 --marionette）
+#     ENDFIELD_MARIONETTE_PORT  守护连接的端口，默认 2828
+#     ENDFIELD_LOG=1            写日志（默认: 游戏模式(gamescope)下自动写，桌面模式不打）
 #
 # 日志: 固定路径 $HOME/.var/app/org.mozilla.firefox/endfield-cloud/launch-firefox.log
-#       (放在 Flatpak 可见的目录; gamescope 下无终端,靠它排查)
+#       (放在 Flatpak 可见的目录；gamescope 下无终端，靠它排查)
 
 set -u
 
@@ -49,7 +51,7 @@ case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) die "$EXIT_PROFILE" "无�
 
 # ---------- Steam 游戏模式环境兜底（必须在 auto 判定之前）----------
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-# 会话继承的 XAUTHORITY 可能是已消失的旧 cookie(DSH/Steam 启动器常见)。
+# 会话继承的 XAUTHORITY 可能是已消失的旧 cookie(Steam 启动器常见)。
 # 只在使用 X11 后端时才有意义，但先在这里纠正，日志里能看出用的是哪个文件。
 if [ -n "${XAUTHORITY:-}" ] && [ ! -r "$XAUTHORITY" ]; then
   for candidate in "$XDG_RUNTIME_DIR"/xauth_*; do
@@ -131,7 +133,7 @@ fi
 
 # ---------- Wayland / X11 后端选择 ----------
 # 桌面 KWin: MOZ_ENABLE_WAYLAND=1(原生 Wayland,输入/分数缩放更好)
-# Gamescope(项目 README 实测只显示 X11 窗口): 默认 XWayland
+# Gamescope(项目实测只显示 X11 窗口): 默认 XWayland
 BACKEND="${ENDFIELD_FIREFOX_BACKEND:-}"
 if [ -z "$BACKEND" ]; then
   if [ -n "${IN_GAMESCOPE:-}" ] || [ -n "${GAMESCOPE_WAYLAND_DISPLAY:-}" ] \
@@ -146,8 +148,54 @@ case "$BACKEND" in wayland|x11) ;; *) BACKEND="wayland";; esac
 # XWayland 后端需要 DISPLAY；游戏模式下 Steam 一般已注入 :0，缺了兜底。
 if [ "$BACKEND" = "x11" ]; then export DISPLAY="${DISPLAY:-:0}"; fi
 
+# ---------- 标签页守护（锁定云游戏标签页；详见 docs/tabs-and-gamepad.md）----------
+# 只有守护真的能跑，才给 Firefox 加 --marionette；关掉守护就不开端口。
+GUARD_ENABLED="${ENDFIELD_TAB_GUARD:-1}"
+MARIONETTE_PORT="${ENDFIELD_MARIONETTE_PORT:-2828}"
+GUARD_SCRIPT="${ENDFIELD_GUARD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/tab-guard.py}"
+GUARD_ACTIVE=0
+
+port_busy() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]"
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]"
+  else
+    return 1
+  fi
+}
+
+start_tab_guard() {
+  [ "$GUARD_ENABLED" = "1" ] || { log "tab-guard: disabled (ENDFIELD_TAB_GUARD=0)"; return 0; }
+  if [ ! -f "$GUARD_SCRIPT" ]; then
+    echo "[launch-firefox] 未找到 $GUARD_SCRIPT，跳过标签页守护（Ctrl+Tab / Ctrl+1 仍可用）。" >&2
+    log "WARN: tab-guard script missing: $GUARD_SCRIPT"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "[launch-firefox] 未找到 python3，跳过标签页守护（Ctrl+Tab / Ctrl+1 仍可用）。" >&2
+    log "WARN: python3 missing, tab guard skipped"
+    return 0
+  fi
+  if port_busy "$MARIONETTE_PORT"; then
+    echo "[launch-firefox] 端口 $MARIONETTE_PORT 已被占用，跳过标签页守护（可能是 geckodriver）。" >&2
+    log "WARN: port $MARIONETTE_PORT busy, tab guard skipped"
+    return 0
+  fi
+  # 后台守护：与 Firefox 的连接断开（浏览器退出）后自行结束。
+  python3 "$GUARD_SCRIPT" --watch --port "$MARIONETTE_PORT" --url "$URL" >>"$LOG_FILE" 2>&1 &
+  GUARD_ACTIVE=1
+  log "tab-guard: started (pid $!, port $MARIONETTE_PORT)"
+  return 0
+}
+
+[ "${DRY_RUN:-0}" = "1" ] || start_tab_guard
+
 # ---------- 组装命令 ----------
-FF_ARGS="--no-remote --new-instance --profile"
+# 注意顺序：--marionette 必须在 --profile 之前，否则会被 --profile 当成参数值吃掉。
+FF_ARGS="--no-remote --new-instance"
+[ "$GUARD_ACTIVE" = "1" ] && FF_ARGS="$FF_ARGS --marionette"
+FF_ARGS="$FF_ARGS --profile"
 case "$FIREFOX_KIND" in
   flatpak)
     CMD_PREFIX="flatpak run"
@@ -183,7 +231,7 @@ if [ "$FIREFOX_KIND" = "flatpak" ]; then
 else
   FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS \"$RUN_URL\""
 fi
-echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND"
+echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
 echo "[launch-firefox] profile=$RUNTIME_PROFILE"
 echo "[launch-firefox] exec: $FINAL_CMD"
 log "exec: $FINAL_CMD"

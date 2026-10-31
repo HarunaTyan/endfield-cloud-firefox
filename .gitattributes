@@ -1,0 +1,8 @@
+# 仓库主要在 Linux（Steam Deck）上构建运行：文本文件一律 LF，
+# 避免在 Windows 上克隆/提交时把 CRLF 带进 shell 脚本与 python 脚本。
+* text=auto eol=lf
+
+*.AppImage binary
+*.png binary
+*.jpg binary
+*.webp binary

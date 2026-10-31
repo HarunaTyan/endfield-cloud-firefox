@@ -1,4 +1,4 @@
-# Build output (release assets are attached to GitHub Releases)
+# 构建产物（二进制走 GitHub Release，不进仓库）
 dist/
 build/
 *.AppImage
@@ -8,7 +8,7 @@ build/
 *.snap
 *.tar.gz
 
-# Local-only evidence and scratch files
+# 本机证据与临时文件
 /analysis/
 /out/
 /userData/
@@ -16,7 +16,7 @@ build/
 .DS_Store
 Thumbs.db
 
-# Editor / Python
+# 编辑器 / Python
 .vscode/
 .idea/
 *.swp
@@ -24,15 +24,11 @@ Thumbs.db
 __pycache__/
 *.pyc
 
-# Icon placeholders / test artifacts
+# 图标占位与测试产物
 resources/icons/*.bak
 resources/icons/_unused/
 
-# Local helper docs
+# 本机备忘（不入库）
 UPLOAD_GITHUB.txt
 LOCAL_*.txt
 NOTES_*.md
-
-# Python 缓存
-__pycache__/
-*.pyc

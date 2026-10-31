@@ -1,9 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=Endfield Cloud (Firefox)
-Comment=Endfield Cloud web client, Firefox/Gecko shell via Flatpak
+Name=云·终末地 (Firefox)
+Name[en]=Endfield Cloud (Firefox)
+Comment=《明日方舟：终末地》官方云游戏页外壳，经由 Flatpak Firefox 启动
+Comment[en]=Shell for the official Arknights: Endfield cloud page, via Flatpak Firefox
 Exec=AppRun
 Icon=endfield-cloud-firefox
 Terminal=false
 Categories=Game;
-Keywords=Endfield;Cloud;Firefox;Steam Deck;
+Keywords=Endfield;Cloud;Firefox;Steam Deck;云游戏;终末地;

@@ -1,12 +1,13 @@
 #!/bin/sh
-# Endfield Cloud — Firefox shell 环境体检（只读，不做任何改动）
-# 检查: flatpak 存在性 / Firefox 版本 / devices=all 权限 / runtime profile 可写
+# 云·终末地 · 环境体检（只读，不做任何改动）
+# 检查: flatpak / Firefox 版本 / devices=all 权限 / runtime profile 可写 / python3 / Marionette 端口
 
 FLATPAK_ID="org.mozilla.firefox"
 RUNTIME_BASE="$HOME/.var/app/$FLATPAK_ID/endfield-cloud"
+MARIONETTE_PORT="${ENDFIELD_MARIONETTE_PORT:-2828}"
 FAIL=0
 
-echo "== Firefox shell 环境体检 =="
+echo "== 云·终末地 · Firefox 外壳环境体检 =="
 
 # 1. flatpak 命令
 if command -v flatpak >/dev/null 2>&1; then
@@ -53,6 +54,27 @@ else
   echo "[MISS] 无法创建/写入 $RUNTIME_BASE"; FAIL=1
 fi
 
+# 7. python3（标签页守护需要）
+if command -v python3 >/dev/null 2>&1; then
+  echo "[OK] python3: $(command -v python3)（标签页守护可用）"
+else
+  echo "[WARN] 无 python3 —— 标签页守护不会启动；Ctrl+Tab / Ctrl+1 / Ctrl+W 仍可用"
+  echo "       SteamOS 通常自带；没有就装一个，或接受没有「云游戏标签关不掉」这层保护"
+fi
+
+# 8. Marionette 端口
+if command -v ss >/dev/null 2>&1; then
+  if ss -ltn 2>/dev/null | grep -qE "[:.]$MARIONETTE_PORT[[:space:]]"; then
+    echo "[WARN] 端口 $MARIONETTE_PORT 已被占用（geckodriver？）——启动器会跳过标签页守护"
+  else
+    echo "[OK] 端口 $MARIONETTE_PORT 空闲（标签页守护可用）"
+  fi
+fi
+
 echo "== 结论 =="
-[ "$FAIL" = 0 ] && echo "环境满足，可直接运行 scripts/launch-firefox.sh" || echo "存在缺项，按上面提示处理后重试"
+if [ "$FAIL" = 0 ]; then
+  echo "环境满足，可直接运行 scripts/launch-firefox.sh（或 Steam 里的 AppImage）"
+else
+  echo "存在缺项，按上面提示处理后重试"
+fi
 exit "$FAIL"

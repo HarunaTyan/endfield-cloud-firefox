@@ -1,4 +1,4 @@
-/* Endfield Cloud — Firefox 窗口化模式 UI 精简
+/* 云·终末地 · Firefox 窗口化模式 UI 精简
  * 仅在窗口化(--windowed)模式有意义；kiosk 模式下 Firefox 自带无边框全屏，
  * 不读取/不依赖本文件。需要 user.js 里
  * toolkit.legacyUserProfileCustomizations.stylesheets=true 才生效。
@@ -10,7 +10,9 @@
   background-color: #000 !important;
 }
 
-/* 隐藏标签栏、导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单） */
+/* 隐藏标签栏、导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单）
+ * 想在窗口化模式下看到标签栏（能用鼠标点掉误开的标签），把下面 #TabsToolbar
+ * 那一行注释掉即可。 */
 #TabsToolbar { display: none !important; }
 #nav-bar { display: none !important; }
 #PersonalToolbar { display: none !important; }
@@ -22,4 +24,17 @@ scrollbar, scrollbox, ::-webkit-scrollbar {
 }
 scrollbar[orient="vertical"], scrollbar[orient="horizontal"] {
   visibility: collapse !important;
+}
+
+/* Ctrl+Tab 标签切换面板：kiosk 全屏下也要能看清当前是第几个标签
+ * （标签栏被隐藏后，这个面板是唯一能看到标签标题的地方） */
+#ctrlTab-panel {
+  font-size: 1.15em !important;
+}
+#ctrlTab-panel .ctrlTab-preview-title {
+  font-size: 1.05em !important;
+  font-weight: 600 !important;
+}
+#ctrlTab-panel .ctrlTab-preview-content {
+  opacity: 0.92 !important;
 }

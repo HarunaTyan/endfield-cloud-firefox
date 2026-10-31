@@ -8,11 +8,11 @@
 #
 # 用法：
 #   steam-shortcut.py --list
-#   steam-shortcut.py --name "Endfield Cloud" \
-#       --exe "/path/to/launch-firefox.sh" --dry-run
-#   steam-shortcut.py --name "Endfield Cloud" \
-#       --exe "/path/to/launch-firefox.sh"
-#   steam-shortcut.py --remove "Endfield Cloud"
+#   steam-shortcut.py --name "云·终末地" \
+#       --exe "/path/to/endfield-cloud-firefox-<版本>.AppImage" --dry-run
+#   steam-shortcut.py --name "云·终末地" \
+#       --exe "/path/to/endfield-cloud-firefox-<版本>.AppImage"
+#   steam-shortcut.py --remove "云·终末地"
 #
 # 安全约束：
 #   - 默认拒绝在 Steam 运行时写入（Steam 退出时会覆盖 shortcuts.vdf）

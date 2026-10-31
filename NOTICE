@@ -1,5 +1,5 @@
-Endfield Cloud Firefox Shell
-============================
+云·终末地 · Firefox 外壳
+==========================
 
 This is an unofficial, non-commercial community project. It is not affiliated
 with, endorsed by, or sponsored by Hypergryph Network Technology Co., Ltd. or
@@ -21,3 +21,16 @@ The MIT license in LICENSE applies only to original source code in this
 repository. It does not grant any rights to third-party trademarks, game
 content, official artwork, the Firefox/Flatpak runtimes, or other third-party
 components.
+
+中文摘要
+--------
+
+本项目为非官方、非营利的社区项目，与鹰角网络（Hypergryph）、Gryphline 无隶属、认可或赞助关系。
+「明日方舟：终末地」及相关名称、标识、游戏素材与商标归各自权利人所有。
+
+本仓库不包含游戏客户端、游戏数据、账号凭据或官方美术资源：外壳只负责在用户自己的浏览器里打开
+官方云游戏页，不绕过登录、不改动网络流量、不篡改游戏数据；使用官方服务须遵守其自身条款。
+
+Firefox 是 Mozilla 基金会的商标，Flatpak 是 Flatpak 项目的商标，AppImage 格式与 appimagetool
+是各自的第三方项目。`LICENSE` 里的 MIT 只覆盖本仓库的原创源码，不授予任何第三方商标、游戏内容、
+官方美术、Firefox/Flatpak 运行时或其他第三方组件的权利。

@@ -1,11 +1,11 @@
-// Endfield Cloud — Firefox profile prefs (cloud gaming oriented)
+// 云·终末地 · Firefox profile prefs（云游戏方向）
 // 所有 pref 名均已对本机 Firefox 158.0 (Flatpak) 的 libxul.so / greprefs.js /
 // firefox.js 做过字符串核对（2026-10-20）；被移除的 pref 以注释保留并说明。
 // user.js 在每次启动时覆盖 prefs.js 中的同名项；Firefox 退出时会把值写回 prefs.js。
 
 // ==== 硬件解码 / 渲染 ====
 // 注意：media.ffmpeg.vaapi.enabled 在 Firefox 158 已不存在（VA-API 默认启用且
-// pref 被上游移除，libxul.so 中已无此字符串）。无需也无法设置。
+// pref 被 Mozilla 移除，libxul.so 中已无此字符串）。无需也无法设置。
 // 158 仍存在的相关开关：media.rdd-ffmpeg.enabled（RDD 解码进程，默认开）。
 user_pref("media.hardware-video-decoding.enabled", true);
 user_pref("media.hardware-video-decoding.force-enabled", true);
@@ -47,6 +47,22 @@ user_pref("browser.uidensity", 1);
 user_pref("browser.toolbars.bookmarks.visibility", "never");
 user_pref("browser.newtabpage.enabled", false);
 user_pref("browser.startup.page", 0);
+
+// ==== 标签页：切换 / 关闭 / 防误关 ====
+// 详解见 docs/tabs-and-gamepad.md。快捷键由 Firefox 原生处理，锁定由启动器拉起的
+// scripts/tab-guard.py 负责；这里只放让原生行为更安全的开关。
+// 关掉最后一个标签不连窗口一起关：误按 Ctrl+W 不会把整个 shell 关掉。
+user_pref("browser.tabs.closeWindowWithLastTab", false);
+// 页面里点开的链接在后台打开：云游戏标签页不会被抢走聚焦，误触时画面不中断。
+user_pref("browser.tabs.loadInBackground", true);
+// 多标签时关窗要确认（Steam「退出游戏」走信号，不受影响）。
+user_pref("browser.tabs.warnOnClose", true);
+user_pref("browser.tabs.warnOnCloseOtherTabs", true);
+// Ctrl+Shift+T 的后悔药数量。
+user_pref("browser.sessionstore.max_tabs_undo", 12);
+user_pref("browser.sessionstore.max_windows_undo", 3);
+// Ctrl+Tab 按标签顺序走而不是按最近使用，位置可预期。
+user_pref("browser.ctrlTab.sortByRecentlyUsed", false);
 
 // ==== 遥测 / 检查 / 恢复 / 杂项 ====
 user_pref("datareporting.policy.dataSubmissionEnabled", false);
