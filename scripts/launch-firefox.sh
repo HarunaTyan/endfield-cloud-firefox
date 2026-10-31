@@ -36,10 +36,10 @@ log() { [ "${ENDFIELD_LOG:-}" = "1" ] || [ -n "${IN_GAMESCOPE:-}" ] || return 0;
 die() { code=$1; shift; echo "[launch-firefox] $*" >&2; log "FATAL($code): $*"; exit "$code"; }
 
 # ---------- 参数解析 ----------
-URL="$DEFAULT_URL"; WIDTH=1280; HEIGHT=800; WINDOW_MODE="auto"
+URL="$DEFAULT_URL"; URL_EXPLICIT=0; WIDTH=1280; HEIGHT=800; WINDOW_MODE="auto"
 for arg in "$@"; do
   case "$arg" in
-    --url=*)           URL="${arg#--url=}" ;;
+    --url=*)           URL="${arg#--url=}"; URL_EXPLICIT=1 ;;
     --window-size=*)   WxH="${arg#--window-size=}"; WIDTH="${WxH%%x*}"; HEIGHT="${WxH##*x}" ;;
     --fullscreen)      WINDOW_MODE="fullscreen" ;;
     --windowed)        WINDOW_MODE="windowed" ;;
@@ -227,12 +227,17 @@ fi
 
 RUN_URL="$URL"
 [ -n "$RUN_URL" ] && [ "${RUN_URL#http}" = "$RUN_URL" ] && [ "${RUN_URL#--}" = "$RUN_URL" ] && RUN_URL="https://$RUN_URL"
+# 主页(homepage)已经是云游戏页，只有用户显式 --url 时才在命令行再传一次，
+# 否则 Firefox 会「开主页 + 再开一个参数里的 URL」→ 两个一模一样 /cloud 标签。
+if [ "$URL_EXPLICIT" != "1" ]; then
+  RUN_URL=""
+fi
 
 # ---------- 打印 & 执行 ----------
 if [ "$FIREFOX_KIND" = "flatpak" ]; then
-  FINAL_CMD="$CMD_PREFIX $ENV_ARGS $FLATPAK_ID $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS \"$RUN_URL\""
+  FINAL_CMD="$CMD_PREFIX $ENV_ARGS $FLATPAK_ID $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS${RUN_URL:+ \"$RUN_URL\"}"
 else
-  FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS \"$RUN_URL\""
+  FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS${RUN_URL:+ \"$RUN_URL\"}"
 fi
 echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
 echo "[launch-firefox] profile=$RUNTIME_PROFILE"
@@ -243,8 +248,8 @@ log "exec: $FINAL_CMD"
 # exec: 让 Firefox 成为 Steam 快捷方式的直接子进程(退出码直接回传给 Steam)
 if [ "$FIREFOX_KIND" = "flatpak" ]; then
   # shellcheck disable=SC2086
-  exec flatpak run $ENV_ARGS "$FLATPAK_ID" $FF_ARGS "$RUNTIME_PROFILE" $MODE_ARGS "$RUN_URL"
+  exec flatpak run $ENV_ARGS "$FLATPAK_ID" $FF_ARGS "$RUNTIME_PROFILE" $MODE_ARGS ${RUN_URL:+"$RUN_URL"}
 else
   # shellcheck disable=SC2086
-  exec "$FIREFOX_BIN" $FF_ARGS "$RUNTIME_PROFILE" $MODE_ARGS "$RUN_URL"
+  exec "$FIREFOX_BIN" $FF_ARGS "$RUNTIME_PROFILE" $MODE_ARGS ${RUN_URL:+"$RUN_URL"}
 fi

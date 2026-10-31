@@ -46,7 +46,10 @@ user_pref("browser.tabs.inTitlebar", 0);
 user_pref("browser.uidensity", 1);
 user_pref("browser.toolbars.bookmarks.visibility", "never");
 user_pref("browser.newtabpage.enabled", false);
-user_pref("browser.startup.page", 0);
+// 云游戏就是主页：启动只开这一个标签；关掉最后一个标签也不会退出浏览器，
+// 新开出来的空标签由守护装回主页 —— 保证「没手动钉标签时永远只有一个标签页」。
+user_pref("browser.startup.page", 1);
+user_pref("browser.startup.homepage", "https://endfield.hypergryph.com/cloud");
 
 // ==== 标签页：切换 / 关闭 / 防误关 ====
 // 详解见 docs/tabs-and-gamepad.md。快捷键由 Firefox 原生处理，锁定由启动器拉起的
@@ -57,6 +60,9 @@ user_pref("browser.tabs.closeWindowWithLastTab", false);
 user_pref("browser.tabs.loadInBackground", true);
 // 会话恢复时立刻加载每个标签，不懒加载：懒加载的标签 URL 还是 about:blank，
 // 守护脚本会误判「云游戏页不在」而再开一页，用户就看到两个同样的网页。
+// 升级后别弹「新特性」标签、首次运行别弹欢迎页，否则启动就多一个标签
+user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("browser.aboutwelcome.enabled", false);
 user_pref("browser.sessionstore.restore_on_demand", false);
 // 多标签时关窗要确认（Steam「退出游戏」走信号，不受影响）。
 user_pref("browser.tabs.warnOnClose", true);

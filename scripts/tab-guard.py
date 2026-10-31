@@ -370,15 +370,36 @@ if (ST.selfPinned) {
   }
 }
 
+function isBlankTab(tab) {
+  const spec = tabSpec(tab);
+  return spec === "" || spec === "about:blank" || spec === "about:newtab" || spec === "about:home";
+}
+
+let reused = false;
 if (!game && !ONLY_LIST) {
   // 会话恢复是懒加载：pending 的标签 URL 还是 about:blank，看起来「没有云游戏页」。
   // 这种情况下新建标签就会多出一页，所以先等它加载完。
   const pending = Array.from(gB.tabs).some(isPending);
   if (!pending) {
+    const p = Services.scriptSecurityManager.getSystemPrincipal();
+    const all = Array.from(gB.tabs);
+    const blank = all.length === 1 && isBlankTab(all[0]) ? all[0] : null;
     try {
-      const p = Services.scriptSecurityManager.getSystemPrincipal();
-      game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
-      created = true;
+      if (blank) {
+        // 只剩一个空标签（关掉最后一个标签后会这样）⇒ 就地装回云游戏，不新增一页
+        const b = blank.linkedBrowser;
+        if (b && typeof b.loadURI === "function") {
+          b.loadURI(GAME_URL, { triggeringPrincipal: p });
+          game = blank;
+          reused = true;
+        } else {
+          game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
+          created = true;
+        }
+      } else if (all.length === 0) {
+        game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
+        created = true;
+      }
     } catch (e) {
       return { ok: false, err: "add-tab-failed", detail: String(e) };
     }
@@ -415,6 +436,7 @@ return {
   ok: true,
   gameFound: !!game,
   created: created,
+  reused: reused,
   collapsed: collapsed,
   ambiguous: ambiguous,
   blocked: ST.blocked,

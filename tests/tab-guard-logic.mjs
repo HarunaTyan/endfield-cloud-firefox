@@ -102,14 +102,37 @@ function check(name, cond, detail = "") {
   check("once.still-blocked", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
 }
 
-// 2) 云游戏标签缺失 → 自动重建、固定、切回
+// 2a) 一个标签都没有 → 新建云游戏页、固定、切回
 {
-  const gB = mkBrowser([mkTab(STRAY)]);
+  const gB = mkBrowser([]);
   const st = run("once", gB);
   check("rebuild.added", gB.added === GAME, String(gB.added));
   check("rebuild.pinned", gB.tabs.find((t) => t.label === GAME)?.pinned === true);
   check("rebuild.created", st.created === true);
   check("rebuild.selected", gB.selectedTab.label === GAME);
+}
+
+// 2b) 只剩一个空标签（关掉最后一个标签后）→ 就地装回主页，不新增一页
+{
+  const blank = mkTab("about:blank");
+  blank.loadedTo = null;
+  blank.linkedBrowser.loadURI = (uri) => { blank.loadedTo = uri; blank.attrs.delete("pending"); };
+  const gB = mkBrowser([blank]);
+  const st = run("once", gB);
+  check("reuse.loaded", blank.loadedTo === GAME, String(blank.loadedTo));
+  check("reuse.no-add", gB.added === null, String(gB.added));
+  check("reuse.one-tab", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
+  check("reuse.flag", st.reused === true);
+  check("reuse.pinned", blank.pinned === true);
+}
+
+// 2c) 只剩一个普通网页 → 不硬塞云游戏页（用户自己关掉了游戏，别抢）
+{
+  const gB = mkBrowser([mkTab(STRAY)]);
+  const st = run("once", gB);
+  check("stray.no-add", gB.added === null, String(gB.added));
+  check("stray.kept", gB.tabs.length === 1 && gB.tabs[0].label === STRAY);
+  check("stray.gameFound", st.gameFound === false);
 }
 
 // 3) list：只读，不建标签、不打补丁、不动选中
