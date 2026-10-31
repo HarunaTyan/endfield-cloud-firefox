@@ -41,6 +41,37 @@
 - `browser.sessionstore.max_tabs_undo=12`：给 `Ctrl+Shift+T` 留够后悔药。
 - `browser.ctrlTab.sortByRecentlyUsed=false`：`Ctrl+Tab` 按标签顺序走，不是按最近使用，位置可预期。
 
+### 被关掉的快捷键
+
+这台机器的用途是玩一个云游戏，不是日常上网。下面这些组合**按下去没有反应**，理由是不小心按到就会留下
+改不回来的东西（装了扩展、清了登录态）或者多开一条串流：
+
+| 组合 | 原本做什么 | 为什么关 |
+|---|---|---|
+| `Alt` / `F10` | 唤出菜单栏 | 菜单能开附加组件、开发者工具、清数据 |
+| `Alt`+字母 | 菜单访问键 | 同上 |
+| `Ctrl+N` | 新窗口 | 第二个窗口可能再开一条串流 |
+| `Ctrl+Shift+P` | 隐私窗口 | 同上，且不共享登录态 |
+| `Ctrl+Shift+A` | 附加组件管理器 | 装了扩展就留在 profile 里，重置不掉 |
+| `F12` / `Ctrl+Shift+I` | 开发者工具 | dock 会挤掉游戏画面 |
+| `Ctrl+Shift+K` | 网页控制台 | 同上 |
+| `Ctrl+Shift+C` | 元素检查器 | 同上 |
+| `Ctrl+U` | 查看源码 | 新开一个标签，没用 |
+| `Ctrl+J` | 下载面板 | 界面噪音 |
+| `Ctrl+Shift+O` | 书签库 | 管理窗口，会盖住游戏 |
+| `Ctrl+P` | 打印 | 弹系统对话框，手柄难以退出 |
+| `Ctrl+S` | 另存页面 | 同上 |
+| `Ctrl+O` | 打开本地文件 | 同上 |
+
+实现分两处：`Alt`/`F10`/访问键/工具栏遍历走 `user.js` 的 pref；那批 `Ctrl` 组合由
+`scripts/tab-guard.py` 在 chrome 窗口的捕获阶段 `preventDefault()`——所以 **守护关掉时这些键会回来**
+（`ENDFIELD_TAB_GUARD=0`），单独放行键盘用 `ENDFIELD_KEY_BLOCK=0`。
+
+**保留的**：所有标签页快捷键、`Ctrl+L`、`Ctrl+F`、缩放、复制粘贴。这些是能把浏览器用下去的基础。
+
+> 注意 `Ctrl+Shift+Del`（清除浏览数据）**没有**被关——它会清掉 cookie，导致要重新登录。
+> 需要的话加一条：`ENDFIELD_KEY_BLOCK` 旁边再加一个清单项即可。
+
 **新标签页（`Ctrl+T`）为什么不是云游戏**：Firefox 41 起移除了 `browser.newtab.url`，
 官方立场是「新标签页内容只由扩展或企业策略决定」，没有任何 pref 能改。想改只能装扩展
 （如 New Tab Override），或者由守护拦截新标签强行导航——后者会把「打开新标签」变成不可用的按钮。

@@ -2,6 +2,26 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.0.16
+
+把一批「按错一下就把机器搞坏」的浏览器快捷键关掉。
+
+### 新增
+
+- **菜单栏不再弹出**：`ui.key.menuAccessKey=0`（Alt / F10 失效）、`ui.key.chromeAccess=0`、
+  `ui.key.contentAccess=0`（Alt+字母 的菜单访问键失效），外加 CSS 压住 `#toolbar-menubar`。
+- **工具栏键盘遍历关闭**：`browser.toolbars.keyboard_navigation=false`，Tab 焦点只落在页面上。
+- **守护拦下这 13 个组合**（chrome 捕获阶段 `preventDefault`）：
+  `Ctrl+N`、`Ctrl+Shift+P`、`Ctrl+Shift+A`、`Ctrl+Shift+I`、`Ctrl+Shift+K`、`Ctrl+Shift+C`、
+  `Ctrl+Shift+O`、`Ctrl+U`、`Ctrl+J`、`Ctrl+P`、`Ctrl+S`、`Ctrl+O`、`F12`。
+  拦它们的理由：装扩展、清数据、开第二个窗口（多一条串流）、开发者工具挤掉画面。
+- **开关**：`ENDFIELD_KEY_BLOCK=0` 放行全部；`ENDFIELD_TAB_GUARD=0` 时这一段同样不生效
+  （这类拦截由守护装，不依赖 profile 里的 pref）。
+
+### 保留
+
+- 标签页全部（`Ctrl+T/W/Shift+T/Tab/1-9`）、`Ctrl+L` 地址栏、`Ctrl+F` 查找、缩放、复制粘贴。
+
 ## v1.0.15
 
 把「永远只有一个标签页」做成结构上的保证，而不是靠不许出错。

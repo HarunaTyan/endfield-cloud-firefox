@@ -218,6 +218,7 @@ class MarionetteClient:
 
 
 JS_TEMPLATE = r"""const HOSTS = %(hosts)s;
+const BLOCKED_KEYS = %(blocked_keys)s;
 const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
 const COLLAPSE = %(collapse)s;
@@ -299,6 +300,32 @@ const ST = (win.__endfieldTabGuard = win.__endfieldTabGuard || {
   patched: false,
 });
 if (!Array.isArray(ST.hosts) || ST.hosts.join(",") !== HOSTS.join(",")) ST.hosts = HOSTS;
+
+// ---- 键盘：屏蔽一批「能把这台机器搞坏」的浏览器快捷键（幂等）----
+// 装在 chrome 窗口的捕获阶段：浏览器自己的快捷键命令（建窗口、开附加组件、开开发者工具）
+// 都走这里，先一步 preventDefault 就轮不到它们。
+// 被拦：Ctrl+N、Ctrl+Shift+P/A/I/K/C/O、Ctrl+U/J/P/S/O、F12。
+// 要放行就设 ENDFIELD_KEY_BLOCK=0（此时整段不装）。
+if (!ONLY_LIST && !ST.keyFilter && BLOCKED_KEYS.length) {
+  ST.keyFilter = function (ev) {
+    try {
+      if (ev.defaultPrevented || ev.isComposing) return;
+      const key = String(ev.key || "").toLowerCase();
+      for (const spec of BLOCKED_KEYS) {
+        if (key !== spec.key) continue;
+        if (!!ev.ctrlKey !== !!spec.ctrl) continue;
+        if (!!ev.shiftKey !== !!spec.shift) continue;
+        if (!!ev.altKey !== !!spec.alt) continue;
+        if (!!ev.metaKey !== !!spec.meta) continue;
+        ev.preventDefault();
+        ev.stopPropagation();
+        ST.blockedKeys = (ST.blockedKeys || 0) + 1;
+        return;
+      }
+    } catch (e) {}
+  };
+  win.addEventListener("keydown", ST.keyFilter, true);
+}
 
 // ---- 打补丁：云游戏标签关不掉（幂等）----
 // 注意：Firefox 原生 pinned 页本来就拦 Ctrl+W，所以这个补丁主要兜「标签栏关闭按钮 /
@@ -440,6 +467,7 @@ return {
   collapsed: collapsed,
   ambiguous: ambiguous,
   blocked: ST.blocked,
+  blockedKeys: ST.blockedKeys || 0,
   respectUser: !!ST.respectUser,
   count: tabs.length,
   activeIndex: gB.tabContainer.selectedIndex,
@@ -448,12 +476,30 @@ return {
 """
 
 
-def build_script(hosts, url, action, collapse=False):
+BLOCKED_KEYS = [
+    {"key": "n", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "p", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "a", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "i", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "k", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "c", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "o", "ctrl": True, "shift": True, "alt": False, "meta": False},
+    {"key": "u", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "j", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "p", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "s", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "o", "ctrl": True, "shift": False, "alt": False, "meta": False},
+    {"key": "f12", "ctrl": False, "shift": False, "alt": False, "meta": False},
+]
+
+
+def build_script(hosts, url, action, collapse=False, block_keys=True):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
         "action": json.dumps(action),
         "collapse": "true" if collapse else "false",
+        "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
     }
 
 
@@ -501,7 +547,8 @@ def main(argv=None):
         action = "once"
 
     collapse = bool(args.collapse) or os.environ.get("ENDFIELD_TAB_GUARD_COLLAPSE", "").strip() == "1"
-    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse)
+    block_keys = os.environ.get("ENDFIELD_KEY_BLOCK", "1").strip() != "0"
+    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse, block_keys)
 
     def log(msg):
         if not args.quiet:
@@ -582,7 +629,7 @@ def main(argv=None):
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
-                    result = parse_status(client.execute(build_script(hosts, args.url, want, collapse)))
+                    result = parse_status(client.execute(build_script(hosts, args.url, want, collapse, block_keys)))
                     last_cmd = {"id": cmd_id, "cmd": want, "result": result}
                     log(
                         "外部命令 %s 完成：标签 %d 个%s"

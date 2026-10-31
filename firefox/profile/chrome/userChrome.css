@@ -19,6 +19,8 @@
 #nav-bar { display: none !important; }
 #PersonalToolbar { display: none !important; }
 #titlebar { display: none !important; }
+/* 菜单栏：pref 已让 Alt/F10 不再唤出，这里再压一层，避免任何路径把它显示出来 */
+#toolbar-menubar { display: none !important; visibility: collapse !important; }
 
 /* 隐藏滚动条（游戏内容自带虚拟摇杆 UI，不需要常驻滚动条） */
 scrollbar, scrollbox, ::-webkit-scrollbar {

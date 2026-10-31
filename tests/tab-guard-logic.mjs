@@ -21,12 +21,29 @@ if (end < 0) throw new Error("JS_TEMPLATE 没有结束标记");
 
 const template = py.slice(body, end);
 
-function buildScript(action, collapse = false) {
+const KEYS = [
+  { key: "n", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "p", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "a", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "i", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "k", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "c", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "o", ctrl: true, shift: true, alt: false, meta: false },
+  { key: "u", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "j", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "p", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "s", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "o", ctrl: true, shift: false, alt: false, meta: false },
+  { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
+];
+
+function buildScript(action, collapse = false, blockKeys = true) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
     .replace("%(action)s", JSON.stringify(action))
-    .replace("%(collapse)s", collapse ? "true" : "false");
+    .replace("%(collapse)s", collapse ? "true" : "false")
+    .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
 function mkTab(url, pinned = false, pending = false) {
@@ -35,6 +52,16 @@ function mkTab(url, pinned = false, pending = false) {
   tab.hasAttribute = (name) => tab.attrs.has(name);
   tab.removeAttribute = (name) => tab.attrs.delete(name);
   return tab;
+}
+
+function mkWin(gB) {
+  const listeners = [];
+  return {
+    gBrowser: gB,
+    addEventListener(type, fn, capture) { listeners.push({ type, fn, capture }); },
+    removeEventListener() {},
+    __listeners: listeners,
+  };
 }
 
 function mkBrowser(tabs, selectedIdx = 0) {
@@ -62,7 +89,8 @@ function mkBrowser(tabs, selectedIdx = 0) {
 }
 
 function run(action, gB, reuse, collapse = false) {
-  const win = reuse || { gBrowser: gB };
+  const win = reuse || mkWin(gB);
+  LAST_WIN = win;
   globalThis.Services = {
     wm: { getMostRecentWindow: () => win },
     scriptSecurityManager: { getSystemPrincipal: () => "SYSTEM" },
@@ -70,6 +98,7 @@ function run(action, gB, reuse, collapse = false) {
   return new Function("window", buildScript(action, collapse))(win);
 }
 
+let LAST_WIN = null;
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail = "") {
@@ -200,7 +229,7 @@ function check(name, cond, detail = "") {
 // 9) 用户手动取消钉住后不再抢回去（同一 window 跑两轮）
 {
   const gB = mkBrowser([mkTab(GAME)], 0);
-  const win = { gBrowser: gB };
+  const win = mkWin(gB);
   run("once", gB, win);
   check("unpin.pinned-first", gB.tabs[0].pinned === true);
   gB.tabs[0].pinned = false;          // 用户手动取消固定
@@ -217,6 +246,76 @@ function check(name, cond, detail = "") {
   check("list.no-collapse", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
   check("list.still-unpinned", gB.tabs[1].pinned === false);
   check("list.collapsed-zero", st.collapsed === 0);
+}
+
+// 11) 键盘拦截：命中清单吞掉，其余放行
+{
+  const gB = mkBrowser([mkTab(GAME)], 0);
+  run("once", gB);
+  const win = LAST_WIN;
+  const keyFilter = win.__endfieldTabGuard.keyFilter;
+  const mk = (key, mods = {}) => ({
+    key,
+    ctrlKey: !!mods.ctrl,
+    shiftKey: !!mods.shift,
+    altKey: !!mods.alt,
+    metaKey: !!mods.meta,
+    defaultPrevented: false,
+    isComposing: false,
+    _stopped: false,
+    preventDefault() { this.defaultPrevented = true; },
+    stopPropagation() { this._stopped = true; },
+  });
+
+  const blocked = [
+    ["n", { ctrl: true }],
+    ["N", { ctrl: true }],
+    ["p", { ctrl: true, shift: true }],
+    ["a", { ctrl: true, shift: true }],
+    ["i", { ctrl: true, shift: true }],
+    ["k", { ctrl: true, shift: true }],
+    ["c", { ctrl: true, shift: true }],
+    ["o", { ctrl: true, shift: true }],
+    ["u", { ctrl: true }],
+    ["j", { ctrl: true }],
+    ["p", { ctrl: true }],
+    ["s", { ctrl: true }],
+    ["o", { ctrl: true }],
+    ["F12", {}],
+  ];
+  let allBlocked = true;
+  for (const [key, mods] of blocked) {
+    const ev = mk(key, mods);
+    keyFilter(ev);
+    if (!ev.defaultPrevented) { allBlocked = false; console.log("  not blocked:", key, JSON.stringify(mods)); }
+  }
+  check("keys.blocked", allBlocked);
+
+  const allowed = [
+    ["c", { ctrl: true }],            // 复制
+    ["v", { ctrl: true }],            // 粘贴
+    ["t", { ctrl: true }],            // 新标签
+    ["w", { ctrl: true }],            // 关标签
+    ["1", { ctrl: true }],            // 回云游戏
+    ["Tab", { ctrl: true }],          // 切标签
+    ["l", { ctrl: true }],            // 地址栏
+    ["f", { ctrl: true }],            // 查找
+    ["s", { ctrl: false }],           // 裸 s
+  ];
+  let noFalsePositive = true;
+  for (const [key, mods] of allowed) {
+    const ev = mk(key, mods);
+    keyFilter(ev);
+    if (ev.defaultPrevented) { noFalsePositive = false; console.log("  wrongly blocked:", key, JSON.stringify(mods)); }
+  }
+  check("keys.allowed", noFalsePositive);
+}
+
+// 12) list 模式不装键盘拦截、不动状态
+{
+  const gB = mkBrowser([mkTab(GAME)], 0);
+  const st = run("list", gB);
+  check("keys.list-no-filter", globalThis.__noop === undefined && LAST_WIN.__endfieldTabGuard.keyFilter === undefined);
 }
 
 console.log("");

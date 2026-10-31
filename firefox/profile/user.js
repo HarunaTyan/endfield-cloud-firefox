@@ -51,6 +51,15 @@ user_pref("browser.newtabpage.enabled", false);
 user_pref("browser.startup.page", 1);
 user_pref("browser.startup.homepage", "https://endfield.hypergryph.com/cloud");
 
+// ==== 屏蔽一批「能把这台机器搞坏」的快捷键 ====
+// Alt（以及 F10）不再唤出菜单栏：菜单里能开附加组件、开发者工具、清数据。
+user_pref("ui.key.menuAccessKey", 0);
+// Alt+字母 的菜单访问键一并关掉（chrome = 界面层，content = 网页里）。
+user_pref("ui.key.chromeAccess", 0);
+user_pref("ui.key.contentAccess", 0);
+// 工具栏的键盘遍历（Tab 落在按钮上）关掉，焦点只留给页面。
+user_pref("browser.toolbars.keyboard_navigation", false);
+
 // ==== 标签页：切换 / 关闭 / 防误关 ====
 // 详解见 docs/tabs-and-gamepad.md。快捷键由 Firefox 原生处理，锁定由启动器拉起的
 // scripts/tab-guard.py 负责；这里只放让原生行为更安全的开关。
