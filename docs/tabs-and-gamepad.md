@@ -41,6 +41,13 @@
 - `browser.sessionstore.max_tabs_undo=12`：给 `Ctrl+Shift+T` 留够后悔药。
 - `browser.ctrlTab.sortByRecentlyUsed=false`：`Ctrl+Tab` 按标签顺序走，不是按最近使用，位置可预期。
 
+**新标签页（`Ctrl+T`）为什么不是云游戏**：Firefox 41 起移除了 `browser.newtab.url`，
+官方立场是「新标签页内容只由扩展或企业策略决定」，没有任何 pref 能改。想改只能装扩展
+（如 New Tab Override），或者由守护拦截新标签强行导航——后者会把「打开新标签」变成不可用的按钮。
+本外壳不做，理由有两条：新标签的意义就是去别处；云游戏页开第二份会再建一条串流，白吃性能和带宽，
+还可能被服务端拒。误按 `Ctrl+T` 得到的是一个空白页（`browser.newtabpage.enabled=false`），
+`Ctrl+W` 一关就回到只有一页的状态。
+
 ## 3. 守护做了什么
 
 `scripts/tab-guard.py` 通过 Firefox 内置的 Marionette 协议（`127.0.0.1:2828`）连进浏览器，
