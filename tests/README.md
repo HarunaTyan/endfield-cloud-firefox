@@ -43,3 +43,12 @@ DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
 ```
 
 `DRY_RUN=1` 只打印最终命令、不启动、也不拉起守护。
+
+## 3. 守护的成本
+
+```sh
+node tests/bench-guard.mjs
+```
+
+从 `tab-guard.py` 取出注入的 JS，用假 tabbrowser 跑 5000 次，报单次执行耗时与折算 CPU。
+用来核对「每 3 秒一轮」的实际开销，改动注入脚本后重跑一次即可。

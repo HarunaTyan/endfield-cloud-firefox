@@ -20,8 +20,13 @@ flatpak override --user --device=all org.mozilla.firefox
 下最新的 `.AppImage` 和 `SHA256SUMS.txt`，放同一个文件夹，然后给它执行权限：
 
 ```sh
-chmod +x endfield-cloud-firefox-*.AppImage
+mkdir -p ~/Applications
+mv endfield-cloud-firefox-*.AppImage ~/Applications/云终末地.AppImage
+chmod +x ~/Applications/云终末地.AppImage
 ```
+
+**名字和路径定下来就别再改。** Steam 按「exe 路径 + 名字」认游戏，带版本号的
+文件名每次升级都会变成一个「新游戏」，手柄布局得重配一遍。
 
 **3. 加进 Steam**　桌面模式 → 库 → 添加游戏 → 添加非 Steam 游戏 → 浏览 → 选那个 `.AppImage`
 （**不是** `.sh`）→ 名字随便写 → 打开它的「控制器」→ 布局选 **Gamepad with Joystick Trackpad**。
