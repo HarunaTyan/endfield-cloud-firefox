@@ -14,6 +14,26 @@
 不要留着中英混排的旧文案。`.github/workflows/release.yml` 里的 `body` 是中文模板；
 每次发版前把「本次改动」写进 `CHANGELOG.md`，Release 正文再指向对应 tag 的 CHANGELOG。
 
+## 发版流程（tag 之后必须补中文说明）
+
+`.github/workflows/release.yml` 只负责构建 AppImage 与上传资产，用的是 GitHub 的
+Auto-generated notes —— 固定小节名（`What's Changed` / `Full Changelog`）由 GitHub 决定，改不了成中文。
+所以流程是「CI 出资产，人补中文正文」：
+
+```sh
+V=v1.0.12
+git tag -a "$V" -m "云·终末地 · Firefox 外壳 $V"
+git push origin "$V"
+gh run watch --exit-status          # 等 CI 打包并上传
+# 从 CHANGELOG 摘出该版本，写成中文正文后覆盖：
+gh release edit "$V" --title "云·终末地 · Firefox 外壳 $V" --notes-file notes.md
+```
+
+想连 workflow 里的中文模板也生效，需要给 gh 的 token 加 `workflow` 权限
+（`gh auth refresh -s workflow`）；加之前改 `.github/workflows/*` 会被 GitHub 直接拒绝推送
+（`refusing to allow an OAuth App to create or update workflow`）。`.github/release.yml`
+只是自动说明的分类配置，不属于 workflow，可以正常提交。
+
 ## 公开前
 
 1. **许可证**：本项目原创代码使用 MIT（`LICENSE`）；`NOTICE` 说明了第三方商标/素材边界
