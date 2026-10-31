@@ -38,11 +38,20 @@ gh release edit "$V" --title "云·终末地 · Firefox 外壳 $V" --notes-file 
 
 1. **许可证**：本项目原创代码使用 MIT（`LICENSE`）；`NOTICE` 说明了第三方商标/素材边界
    （含中文摘要）。本仓库不含任何上游项目的代码或素材，因此不继承、也不需要合并其他项目的许可。
-2. **敏感信息扫描**：
+2. **敏感信息扫描**（工作区 + **全部历史**，两步都要跑）：
+
    ```sh
+   # 只看当前文件
    git grep -nE '/home/|/Users/|<steamid>|ghp_|github_pat_|Bearer|token=' || true
    git status --short
+
+   # 历史里也要扫：删掉的提交不等于消失，任何人翻 git log 都看得到
+   git log --all -p | grep -nE '/home/[a-z]|/Users/[A-Za-z]|ghp_[A-Za-z0-9]{20,}|Bearer [A-Za-z0-9]|token=[A-Za-z0-9]{8,}'
    ```
+   
+   > 历史扫描这一步是补的教训：把敏感内容 `git rm` 再提交一个新 commit，**只改了 HEAD**，
+   > 老内容仍然留在历史里，`git log -p` 或 GitHub 的提交页都能翻到。
+   > 真正删掉要重写历史（见 `SECURITY.md`「万一敏感信息已经提交」）。
 3. **确认被忽略的私有目录没有入库**：
    ```sh
    git ls-files | grep -E '^(analysis|dist|build)/' && echo 'ERROR: private path tracked'
