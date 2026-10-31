@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Endfield Cloud launcher icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0e14"/>
+      <stop offset="1" stop-color="#1a2330"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6d78a"/>
+      <stop offset="1" stop-color="#b97822"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#22a6a0"/>
+      <stop offset="1" stop-color="#9af3e8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- abstract headland / play mark, original geometry -->
+  <path d="M104 146 L408 256 L104 366 Z" fill="none" stroke="url(#gold)" stroke-width="26" stroke-linejoin="round"/>
+  <path d="M178 216 L318 256 L178 296 Z" fill="url(#teal)" opacity="0.92"/>
+  <path d="M96 112 H214" stroke="#9af3e8" stroke-width="10" stroke-linecap="round" opacity="0.55"/>
+  <path d="M96 400 H214" stroke="#f6d78a" stroke-width="10" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="416" cy="104" r="12" fill="#f6d78a"/>
+  <circle cx="416" cy="408" r="8" fill="#9af3e8" opacity="0.7"/>
+</svg>

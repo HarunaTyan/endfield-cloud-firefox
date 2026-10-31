@@ -1,0 +1,38 @@
+# Build output (release assets are attached to GitHub Releases)
+dist/
+build/
+*.AppImage
+*.AppImage.zsync
+*.deb
+*.rpm
+*.snap
+*.tar.gz
+
+# Local-only evidence and scratch files
+/analysis/
+/out/
+/userData/
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor / Python
+.vscode/
+.idea/
+*.swp
+*.swo
+__pycache__/
+*.pyc
+
+# Icon placeholders / test artifacts
+resources/icons/*.bak
+resources/icons/_unused/
+
+# Local helper docs
+UPLOAD_GITHUB.txt
+LOCAL_*.txt
+NOTES_*.md
+
+# Python 缓存
+__pycache__/
+*.pyc

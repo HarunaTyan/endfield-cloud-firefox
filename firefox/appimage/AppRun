@@ -1,0 +1,50 @@
+#!/bin/sh
+# AppImage entry point for the Firefox/Gecko shell.
+# The actual launcher stays in scripts/launch-firefox.sh so the repo and the
+# packaged AppImage share exactly one code path.
+set -u
+
+APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+HERE="$APPDIR/usr/share/endfield-firefox"
+
+case "${1:-}" in
+  --help|-h)
+    cat <<'EOF'
+Endfield Cloud (Firefox) — AppImage launcher
+
+Usage:
+  EndfieldCloudFirefox.AppImage [--url=URL] [--window-size=WxH]
+                                [--fullscreen|--windowed]
+                                [--window-mode=auto|fullscreen|windowed]
+
+Environment:
+  ENDFIELD_FIREFOX_BACKEND=wayland|x11   force render backend
+  ENDFIELD_LOG=1                         keep the launcher log
+  DRY_RUN=1                              print the command without starting
+
+Requires Flatpak org.mozilla.firefox and devices=all (for gamepad).
+EOF
+    exit 0
+    ;;
+  --version)
+    echo "Endfield Cloud Firefox launcher (AppImage)"
+    exit 0
+    ;;
+esac
+
+if [ ! -f "$HERE/profile/user.js" ] || [ ! -x "$HERE/launch-firefox.sh" ]; then
+  echo "[endfield-appimage] package is incomplete: $HERE" >&2
+  exit 3
+fi
+
+# The AppImage mount is read-only. Point the shared launcher at the bundled
+# profile and force it to copy that profile into the Flatpak-visible writable
+# directory before starting Firefox.
+ENDFIELD_FIREFOX_PROFILE_DIR="$HERE/profile"
+ENDFIELD_FIREFOX_RUNTIME_PROFILE="$HOME/.var/app/org.mozilla.firefox/endfield-cloud/profile"
+ENDFIELD_FIREFOX_FORCE_PROFILE_SYNC=1
+ENDFIELD_LOG="${ENDFIELD_LOG:-1}"
+export ENDFIELD_FIREFOX_PROFILE_DIR ENDFIELD_FIREFOX_RUNTIME_PROFILE \
+       ENDFIELD_FIREFOX_FORCE_PROFILE_SYNC ENDFIELD_LOG
+
+exec "$HERE/launch-firefox.sh" "$@"

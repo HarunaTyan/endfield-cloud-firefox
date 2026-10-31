@@ -1,0 +1,36 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax checks
+        run: |
+          sh -n scripts/launch-firefox.sh
+          sh -n scripts/build-firefox-appimage.sh
+          sh -n firefox/appimage/AppRun
+
+      - name: Build AppImage
+        run: sh scripts/build-firefox-appimage.sh
+
+      - name: Checksums
+        run: sha256sum dist/*.AppImage > dist/SHA256SUMS.txt
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.AppImage
+            dist/SHA256SUMS.txt
+          generate_release_notes: true

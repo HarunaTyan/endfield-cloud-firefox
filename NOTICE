@@ -1,0 +1,23 @@
+Endfield Cloud Firefox Shell
+============================
+
+This is an unofficial, non-commercial community project. It is not affiliated
+with, endorsed by, or sponsored by Hypergryph Network Technology Co., Ltd. or
+Gryphline.
+
+"Arknights: Endfield" / "明日方舟：终末地" and related names, logos, game
+assets and trademarks are the property of their respective owners.
+
+This repository contains no game client, game data, account credentials, or
+official artwork. The shell only launches the official cloud-game web page in
+the user's own browser and does not bypass login, modify network traffic, or
+tamper with game data. Use of the official service is subject to its own terms.
+
+Firefox is a trademark of the Mozilla Foundation. Flatpak is a trademark of
+the Flatpak project. The AppImage format and appimagetool are third-party
+projects under their own licenses.
+
+The MIT license in LICENSE applies only to original source code in this
+repository. It does not grant any rights to third-party trademarks, game
+content, official artwork, the Firefox/Flatpak runtimes, or other third-party
+components.

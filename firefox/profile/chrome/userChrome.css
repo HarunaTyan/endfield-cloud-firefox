@@ -1,0 +1,25 @@
+/* Endfield Cloud — Firefox 窗口化模式 UI 精简
+ * 仅在窗口化(--windowed)模式有意义；kiosk 模式下 Firefox 自带无边框全屏，
+ * 不读取/不依赖本文件。需要 user.js 里
+ * toolkit.legacyUserProfileCustomizations.stylesheets=true 才生效。
+ */
+
+/* 黑底，避免加载瞬间白闪 */
+:root {
+  --lwt-accent-color: #000 !important;
+  background-color: #000 !important;
+}
+
+/* 隐藏标签栏、导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单） */
+#TabsToolbar { display: none !important; }
+#nav-bar { display: none !important; }
+#PersonalToolbar { display: none !important; }
+#titlebar { display: none !important; }
+
+/* 隐藏滚动条（游戏内容自带虚拟摇杆 UI，不需要常驻滚动条） */
+scrollbar, scrollbox, ::-webkit-scrollbar {
+  scrollbar-width: none !important;
+}
+scrollbar[orient="vertical"], scrollbar[orient="horizontal"] {
+  visibility: collapse !important;
+}

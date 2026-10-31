@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Endfield Cloud (Firefox)
+Comment=Endfield Cloud web client, Firefox/Gecko shell via Flatpak
+Exec=AppRun
+Icon=endfield-cloud-firefox
+Terminal=false
+Categories=Game;
+Keywords=Endfield;Cloud;Firefox;Steam Deck;

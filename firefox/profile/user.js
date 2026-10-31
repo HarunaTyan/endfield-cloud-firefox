@@ -1,0 +1,66 @@
+// Endfield Cloud — Firefox profile prefs (cloud gaming oriented)
+// 所有 pref 名均已对本机 Firefox 158.0 (Flatpak) 的 libxul.so / greprefs.js /
+// firefox.js 做过字符串核对（2026-10-20）；被移除的 pref 以注释保留并说明。
+// user.js 在每次启动时覆盖 prefs.js 中的同名项；Firefox 退出时会把值写回 prefs.js。
+
+// ==== 硬件解码 / 渲染 ====
+// 注意：media.ffmpeg.vaapi.enabled 在 Firefox 158 已不存在（VA-API 默认启用且
+// pref 被上游移除，libxul.so 中已无此字符串）。无需也无法设置。
+// 158 仍存在的相关开关：media.rdd-ffmpeg.enabled（RDD 解码进程，默认开）。
+user_pref("media.hardware-video-decoding.enabled", true);
+user_pref("media.hardware-video-decoding.force-enabled", true);
+user_pref("gfx.webrender.all", true);
+// 谨慎项：个别驱动下强制加速层可能导致崩溃。若启动黑屏/崩溃，先注释这一行。
+user_pref("layers.acceleration.force-enabled", true);
+
+// ==== WebRTC（云游戏串流依赖）====
+user_pref("media.peerconnection.enabled", true);
+user_pref("media.navigator.enabled", true);
+// 硬件 H.264 编码（WebRTC 路径）。软件 H.264 解码路径的
+// media.webrtc.h264.enabled 在 158 中不存在（已并入 ffmpeg 默认行为）。
+user_pref("media.webrtc.hw.h264.enabled", true);
+
+// ==== WebCodecs / WebTransport ====
+// 两者均已核对存在于 158。WebTransport 默认即 true；显式写以自证。
+user_pref("dom.media.webcodecs.enabled", true);
+user_pref("network.webtransport.enabled", true);
+
+// ==== 手柄 ====
+user_pref("dom.gamepad.enabled", true);
+user_pref("dom.gamepad.extensions.enabled", true);
+user_pref("dom.gamepad.haptic_feedback.enabled", true);
+// Steam Deck 手柄在 Firefox 中以标准 Gamepad API 暴露；震动走 haptic feedback。
+
+// ==== 自动播放 / 全屏 ====
+user_pref("media.autoplay.default", 0);
+user_pref("media.autoplay.blocking_policy", 0);
+user_pref("full-screen-api.allow-trusted-requests-only", false);
+// 全屏警告横幅停留时间(ms)。0 = 立即消失（仍会短暂渲染）。
+user_pref("full-screen-api.warning.timeout", 0);
+user_pref("full-screen-api.keyboardlock-warning.timeout", 0);
+user_pref("pointer-lock-api.warning.timeout", 0);
+
+// ==== 去 UI / 去干扰（窗口化模式；kiosk 模式不依赖这些）====
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+user_pref("browser.tabs.inTitlebar", 0);
+user_pref("browser.uidensity", 1);
+user_pref("browser.toolbars.bookmarks.visibility", "never");
+user_pref("browser.newtabpage.enabled", false);
+user_pref("browser.startup.page", 0);
+
+// ==== 遥测 / 检查 / 恢复 / 杂项 ====
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("toolkit.telemetry.enabled", false);
+user_pref("app.shield.optoutstudies.enabled", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("extensions.pocket.enabled", false);
+user_pref("identity.fxaccounts.enabled", false);
+
+// ==== Cookie：云游戏登录需要持久会话 ====
+// 0 = 接受全部 cookie（含第三方）。选 0 而不是 5（仅同站）的原因：
+// 串流/登录链路可能跨域下发会话 cookie，ETP 严格/同站限制会导致掉登录。
+// 风险：第三方跟踪 cookie 也会被保留——这是专用游戏 shell profile，可接受。
+user_pref("network.cookie.cookieBehavior", 0);
+// 不开 ETP 严格模式（默认平衡即可；严格模式会打断部分串流 CDN）
+user_pref("privacy.trackingprotection.enabled", false);
