@@ -21,7 +21,7 @@ Auto-generated notes —— 固定小节名（`What's Changed` / `Full Changelog
 所以流程是「CI 出资产，人补中文正文」：
 
 ```sh
-V=v1.0.12
+V=v1.0.13
 git tag -a "$V" -m "云·终末地 · Firefox 外壳 $V"
 git push origin "$V"
 gh run watch --exit-status          # 等 CI 打包并上传
@@ -65,7 +65,7 @@ gh release edit "$V" --title "云·终末地 · Firefox 外壳 $V" --notes-file 
    sh scripts/build-firefox-appimage.sh
    DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
    ```
-5. **Release**：打 tag（例如 `v1.0.12`），让 `.github/workflows/release.yml`
+5. **Release**：打 tag（例如 `v1.0.13`），让 `.github/workflows/release.yml`
    构建并附加 AppImage + `SHA256SUMS.txt`；私有仓库的 Release 仅对协作者可见。
 6. **切换可见性**：确认 `git log` 里没有历史私有数据后，再在 GitHub Settings →
    General → Danger Zone 改为 Public；同时启用 Security advisories。
@@ -76,7 +76,7 @@ gh release edit "$V" --title "云·终末地 · Firefox 外壳 $V" --notes-file 
 ```sh
 # 仅演示；实际仓库名以创建时为准
 gh repo create endfield-cloud-firefox --private --source=. --remote=origin --push
-gh release create v1.0.12 dist/endfield-cloud-firefox-1.0.12.AppImage \
-  --title "云·终末地 · Firefox 外壳 v1.0.12" \
+gh release create v1.0.13 dist/endfield-cloud-firefox-1.0.12.AppImage \
+  --title "云·终末地 · Firefox 外壳 v1.0.13" \
   --notes-file CHANGELOG.md
 ```

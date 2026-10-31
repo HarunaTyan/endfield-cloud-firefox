@@ -28,8 +28,12 @@ function buildScript(action) {
     .replace("%(action)s", JSON.stringify(action));
 }
 
-function mkTab(url, pinned = false) {
-  return { label: url, pinned, linkedBrowser: { currentURI: { spec: url, host: new URL(url).host } } };
+function mkTab(url, pinned = false, pending = false) {
+  const tab = { label: url, pinned, linkedBrowser: { currentURI: { spec: url, host: new URL(url).host } } };
+  tab.attrs = new Set(pending ? ["pending"] : []);
+  tab.hasAttribute = (name) => tab.attrs.has(name);
+  tab.removeAttribute = (name) => tab.attrs.delete(name);
+  return tab;
 }
 
 function mkBrowser(tabs, selectedIdx = 0) {
@@ -56,8 +60,8 @@ function mkBrowser(tabs, selectedIdx = 0) {
   return gB;
 }
 
-function run(action, gB) {
-  const win = { gBrowser: gB };
+function run(action, gB, reuse) {
+  const win = reuse || { gBrowser: gB };
   globalThis.Services = {
     wm: { getMostRecentWindow: () => win },
     scriptSecurityManager: { getSystemPrincipal: () => "SYSTEM" },
@@ -138,6 +142,48 @@ function check(name, cond, detail = "") {
   globalThis.Services = { wm: { getMostRecentWindow: () => null }, scriptSecurityManager: {} };
   const st = new Function("window", buildScript("once"))({});
   check("no-window", st.ok === false && st.err === "no-browser-window", JSON.stringify(st));
+}
+
+// 7) 页面自己新开同名 /cloud 页（登录页 + 游戏页）→ 折叠成最新那一页
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
+  const st = run("once", gB);
+  check("dup.collapsed", st.collapsed === 1, "collapsed=" + st.collapsed);
+  check("dup.only-one-cloud", gB.tabs.filter((t) => t.label === GAME).length === 1,
+    "cloud=" + gB.tabs.filter((t) => t.label === GAME).length);
+  check("dup.kept-newest-pinned", gB.tabs[0].label === GAME && gB.tabs[0].pinned === true,
+    "tabs=" + gB.tabs.map((t) => t.label + (t.pinned ? "*" : "")).join("|"));
+  check("dup.stray-kept", gB.tabs.some((t) => t.label === STRAY));
+}
+
+// 8) 会话恢复懒加载：pending 标签不会被当成「没有云游戏页」而再开一页
+{
+  const gB = mkBrowser([mkTab("about:blank", false, true)], 0);
+  const st = run("once", gB);
+  check("pending.no-add", gB.added === null, String(gB.added));
+  check("pending.no-created", st.created === false);
+}
+
+// 9) 用户手动取消钉住后不再抢回去（同一 window 跑两轮）
+{
+  const gB = mkBrowser([mkTab(GAME)], 0);
+  const win = { gBrowser: gB };
+  run("once", gB, win);
+  check("unpin.pinned-first", gB.tabs[0].pinned === true);
+  gB.tabs[0].pinned = false;          // 用户手动取消固定
+  run("once", gB, win);
+  const st = run("once", gB, win);
+  check("unpin.respected", st.respectUser === true && gB.tabs[0].pinned === false,
+    "respectUser=" + st.respectUser + " pinned=" + gB.tabs[0].pinned);
+}
+
+// 10) list 不改任何东西：重复页不折叠、pending 不触发建页、不 pin
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab("about:blank", false, true)], 1);
+  const st = run("list", gB);
+  check("list.no-collapse", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
+  check("list.still-unpinned", gB.tabs[1].pinned === false);
+  check("list.collapsed-zero", st.collapsed === 0);
 }
 
 console.log("");

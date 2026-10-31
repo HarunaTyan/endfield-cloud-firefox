@@ -10,10 +10,12 @@
   background-color: #000 !important;
 }
 
-/* 隐藏标签栏、导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单）
- * 想在窗口化模式下看到标签栏（能用鼠标点掉误开的标签），把下面 #TabsToolbar
- * 那一行注释掉即可。 */
-#TabsToolbar { display: none !important; }
+/* 隐藏导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单）
+ *
+ * 标签栏**保留**：云游戏页点「开始游戏」会自己新开一个同名 /cloud 页，
+ * 隐藏标签栏就看不出有两页，只会觉得「切不回去 / 卡死」。
+ * 想要极简效果（确实不需要标签栏）再手动打开下面这行。 */
+/* #TabsToolbar { display: none !important; } */
 #nav-bar { display: none !important; }
 #PersonalToolbar { display: none !important; }
 #titlebar { display: none !important; }

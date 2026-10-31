@@ -2,6 +2,32 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.0.13
+
+Deck 实测（Firefox 158.0.1）暴露的问题，逐条修掉。
+
+### 修复
+
+- **守护在真 Firefox 上起不来**：`WebDriver:SetContext` 在 138 之后改名成
+  `Marionette:SetContext`，且要求启动参数 `-remote-allow-system-access`。守护现在两个命令名都试，
+  启动器在有守护时自动加那个参数，端口仍只监听回环。
+- **两个同名 `/cloud` 页**：点「开始游戏」时页面自己会新开一个同 URL、同标题的标签，旧版守护
+  按 URL 取了第一个（登录页）固定住，用户看到「固定页 + 切不回去」。现在保留**最新**那个、
+  把旧的折叠掉；`user.js` 关掉 `browser.sessionstore.restore_on_demand`，
+  避免会话恢复时懒加载的标签被误判成「云游戏页不在」而再开一页。
+- **不再跟用户抢固定状态**：用户手动取消固定后，本次会话内不再自动 pin。
+- **窗口化模式标签栏不再隐藏**：`userChrome.css` 里那条 `#TabsToolbar { display:none }`
+  改成注释掉的选项，默认可见。
+- **`--list` / `--close-strays` / `--focus-game` 在守护运行时可用**：Firefox 只允许一个
+  Marionette 会话，第二个连接会把守护踢掉。现在守护每轮写 `tab-guard-state.json`，
+  `--list` 读它；控制命令走 `tab-guard-cmd.json`，由守护用现有会话执行并回写结果。
+- **打包不再带 `__pycache__`**：构建脚本打包前清掉 Python 字节码缓存。
+
+### 变更
+
+- 守护的 `blocked` 计数不再是「关不掉」的证据：原生 pinned 标签本来就拦 `Ctrl+W`。
+- 新增 `tests/bench-guard.mjs`，量守护每轮的实际开销。
+
 ## v1.0.12
 
 ### 新增

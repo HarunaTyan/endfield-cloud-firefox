@@ -55,6 +55,9 @@ user_pref("browser.startup.page", 0);
 user_pref("browser.tabs.closeWindowWithLastTab", false);
 // 页面里点开的链接在后台打开：云游戏标签页不会被抢走聚焦，误触时画面不中断。
 user_pref("browser.tabs.loadInBackground", true);
+// 会话恢复时立刻加载每个标签，不懒加载：懒加载的标签 URL 还是 about:blank，
+// 守护脚本会误判「云游戏页不在」而再开一页，用户就看到两个同样的网页。
+user_pref("browser.sessionstore.restore_on_demand", false);
 // 多标签时关窗要确认（Steam「退出游戏」走信号，不受影响）。
 user_pref("browser.tabs.warnOnClose", true);
 user_pref("browser.tabs.warnOnCloseOtherTabs", true);

@@ -53,6 +53,50 @@ DEFAULT_HOSTS = ["endfield.hypergryph.com"]
 DEFAULT_URL = "https://endfield.hypergryph.com/cloud"
 
 
+DEFAULT_STATE_DIR = os.path.join(os.path.expanduser("~"), ".var", "app", "org.mozilla.firefox", "endfield-cloud")
+
+
+def state_path(explicit=None):
+    if explicit:
+        return explicit
+    env = os.environ.get("ENDFIELD_STATE_FILE", "").strip()
+    if env:
+        return env
+    return os.path.join(DEFAULT_STATE_DIR, "tab-guard-state.json")
+
+
+def command_path(explicit=None):
+    return os.path.splitext(state_path(explicit))[0] + "-cmd.json"
+
+
+def read_json(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def write_json(path, payload):
+    """原子替换：写临时文件再 rename，读的一方永远看不到半截 JSON。"""
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        temp = "%s.tmp-%d" % (path, os.getpid())
+        with open(temp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False)
+        os.replace(temp, path)
+        return True
+    except OSError:
+        return False
+
+
+def state_fresh(path, seconds):
+    try:
+        return (time.time() - os.path.getmtime(path)) <= seconds
+    except OSError:
+        return False
+
+
 class MarionetteError(Exception):
     """Marionette 协议层错误。"""
 
@@ -144,11 +188,17 @@ class MarionetteClient:
     def new_session(self, context="chrome"):
         self.command("WebDriver:NewSession", {"capabilities": {}})
         # 切到 chrome 上下文，才能拿到 gBrowser 等浏览器内部对象。
-        try:
-            self.command("WebDriver:SetContext", {"value": context})
-        except MarionetteError:
-            if context == "chrome":
-                raise
+        # 命令名随版本变过：Firefox 138 之后是 Marionette:SetContext（并且要求启动参数
+        # -remote-allow-system-access），更早的版本才叫 WebDriver:SetContext。两个都试。
+        last = None
+        for name in ("Marionette:SetContext", "WebDriver:SetContext"):
+            try:
+                self.command(name, {"value": context})
+                return
+            except MarionetteError as exc:
+                last = exc
+        if context == "chrome":
+            raise last
 
     def execute(self, script):
         """在 chrome 上下文执行脚本，返回脚本的 JS 返回值。"""
@@ -167,8 +217,7 @@ class MarionetteClient:
         return res
 
 
-JS_TEMPLATE = r"""
-const HOSTS = %(hosts)s;
+JS_TEMPLATE = r"""const HOSTS = %(hosts)s;
 const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
 const ONLY_LIST = MODE_ACTION === "list";
@@ -199,6 +248,24 @@ function tabHost(tab) {
   }
 }
 
+function tabSpec(tab) {
+  try {
+    const b = tab.linkedBrowser;
+    const uri = b && b.currentURI;
+    return uri ? (uri.spec || "") : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function isPending(tab) {
+  try {
+    return !!(tab.hasAttribute && tab.hasAttribute("pending"));
+  } catch (e) {
+    return false;
+  }
+}
+
 function isGame(tab) {
   const h = tabHost(tab);
   if (!h) return false;
@@ -208,58 +275,119 @@ function isGame(tab) {
   return false;
 }
 
-function findGame() {
+function cloudTabs() {
+  const out = [];
   for (const t of gB.tabs) {
-    if (isGame(t)) return t;
+    if (isGame(t)) out.push(t);
   }
-  return null;
+  return out;
 }
 
+// 状态挂在 window 上：跨调用存活，浏览器关掉就自然没了。
+//   blocked      被拦下的关闭次数
+//   selfPinned   我们自己 pin 的那一页（用户取消钉住后就不再抢回）
+//   respectUser  用户手动取消过钉住 ⇒ 本次会话不再自动 pin
+//   patched      补丁是否已打
+//   collapsed    折叠掉的重复云游戏标签数
+const ST = (win.__endfieldTabGuard = win.__endfieldTabGuard || {
+  blocked: 0,
+  since: Date.now(),
+  hosts: HOSTS,
+  selfPinned: null,
+  respectUser: false,
+  patched: false,
+});
+if (!Array.isArray(ST.hosts) || ST.hosts.join(",") !== HOSTS.join(",")) ST.hosts = HOSTS;
+
 // ---- 打补丁：云游戏标签关不掉（幂等）----
-if (!ONLY_LIST && !win.__endfieldTabGuard) {
-  const guard = { blocked: 0, since: Date.now(), hosts: HOSTS };
+// 注意：Firefox 原生 pinned 页本来就拦 Ctrl+W，所以这个补丁主要兜「标签栏关闭按钮 /
+// 中键 / 其它扩展调 removeTab」这些路径；blocked 计数不涨不代表补丁没生效。
+if (!ONLY_LIST && !ST.patched) {
   const origRemoveTab = gB.removeTab.bind(gB);
   const origRemoveCurrentTab = gB.removeCurrentTab.bind(gB);
+  ST.origRemoveTab = origRemoveTab;
   gB.removeTab = function (tab, opts) {
     try {
-      if (tab && isGame(tab)) { guard.blocked += 1; return; }
+      if (tab && isGame(tab)) { ST.blocked += 1; return; }
     } catch (e) {}
     return origRemoveTab(tab, opts);
   };
   gB.removeCurrentTab = function (opts) {
     try {
-      if (gB.selectedTab && isGame(gB.selectedTab)) { guard.blocked += 1; return; }
+      if (gB.selectedTab && isGame(gB.selectedTab)) { ST.blocked += 1; return; }
     } catch (e) {}
     return origRemoveCurrentTab(opts);
   };
-  win.__endfieldTabGuard = guard;
+  ST.patched = true;
 }
-const guard = win.__endfieldTabGuard || { blocked: 0 };
 
-let game = findGame();
+// 关标签时绕过自己的补丁（折叠重复页 / 清场要靠它）
+function hardRemove(tab) {
+  try {
+    (ST.origRemoveTab || gB.removeTab).call(gB, tab, { animate: false });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+let clouds = cloudTabs();
+let collapsed = 0;
 let created = false;
-let closedStrays = 0;
+let game = clouds.length ? clouds[clouds.length - 1] : null;
 
 if (MODE_ACTION === "close-strays") {
+  // 手动清场：留最新的云游戏标签，其余全关
   for (const t of Array.from(gB.tabs)) {
     if (t === game) continue;
-    try { gB.removeTab(t); closedStrays += 1; } catch (e) {}
+    if (hardRemove(t)) collapsed += 1;
+  }
+  clouds = cloudTabs();
+  game = clouds.length ? clouds[clouds.length - 1] : null;
+}
+
+if (!ONLY_LIST && MODE_ACTION !== "close-strays" && clouds.length >= 2) {
+  // 页面点「开始游戏」时自己会新开一个同名 /cloud 页，旧的那个是登录页。
+  // 只保留最新的一页，其余折叠掉 —— 用户在标签栏里就不会看到两个一样的网页。
+  const keep = clouds[clouds.length - 1];
+  for (const t of clouds) {
+    if (t === keep) continue;
+    if (hardRemove(t)) collapsed += 1;
+  }
+  game = keep;
+}
+
+// 用户手动取消过钉住：把「自己 pin 的」这个身份清掉，别再抢回去
+if (ST.selfPinned) {
+  const still = Array.from(gB.tabs).indexOf(ST.selfPinned) >= 0;
+  if (!still) {
+    ST.selfPinned = null;
+  } else if (!ST.selfPinned.pinned) {
+    ST.respectUser = true;
+    ST.selfPinned = null;
   }
 }
 
 if (!game && !ONLY_LIST) {
-  try {
-    const p = Services.scriptSecurityManager.getSystemPrincipal();
-    game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
-    created = true;
-  } catch (e) {
-    return { ok: false, err: "add-tab-failed", detail: String(e) };
+  // 会话恢复是懒加载：pending 的标签 URL 还是 about:blank，看起来「没有云游戏页」。
+  // 这种情况下新建标签就会多出一页，所以先等它加载完。
+  const pending = Array.from(gB.tabs).some(isPending);
+  if (!pending) {
+    try {
+      const p = Services.scriptSecurityManager.getSystemPrincipal();
+      game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
+      created = true;
+    } catch (e) {
+      return { ok: false, err: "add-tab-failed", detail: String(e) };
+    }
   }
 }
 
 if (game && MODE_ACTION !== "list") {
-  try { if (!game.pinned) gB.pinTab(game); } catch (e) {}
-  if (MODE_ACTION === "focus-game" || (MODE_ACTION === "once" && created)) {
+  if (!game.pinned && !ST.respectUser) {
+    try { gB.pinTab(game); ST.selfPinned = game; } catch (e) {}
+  }
+  if (MODE_ACTION === "focus-game" || (created && MODE_ACTION !== "close-strays")) {
     try { gB.selectedTab = game; } catch (e) {}
   }
 }
@@ -269,18 +397,21 @@ const tabs = Array.from(gB.tabs).map(function (t, i) {
     i: i,
     title: t.label || "",
     host: tabHost(t),
-    url: (function () { try { return t.linkedBrowser.currentURI.spec; } catch (e) { return ""; } })(),
+    url: tabSpec(t),
     pinned: !!t.pinned,
     active: t === gB.selectedTab,
-    game: isGame(t)
+    game: isGame(t),
+    pending: isPending(t)
   };
 });
 
 return {
   ok: true,
-  gameFound: !!findGame(),
+  gameFound: !!game,
   created: created,
-  blocked: guard.blocked,
+  collapsed: collapsed,
+  blocked: ST.blocked,
+  respectUser: !!ST.respectUser,
   count: tabs.length,
   activeIndex: gB.tabContainer.selectedIndex,
   tabs: tabs
@@ -308,6 +439,8 @@ def main(argv=None):
     ap.add_argument("--url", default=os.environ.get("ENDFIELD_GAME_URL", DEFAULT_URL))
     ap.add_argument("--host", action="append", default=None, help="云游戏域名，可重复")
     ap.add_argument("--watch", action="store_true", help="持续守护（启动器用）")
+    ap.add_argument("--state-file", default=None,
+                    help="守护把状态写到这个文件；--list 在守护运行时直接读它")
     ap.add_argument("--interval", type=float, default=3.0, help="守护轮询间隔秒，默认 3")
     ap.add_argument("--once", action="store_true", help="只执行一次")
     ap.add_argument("--list", action="store_true", help="列出标签页")
@@ -340,6 +473,33 @@ def main(argv=None):
     def log(msg):
         if not args.quiet:
             print("[tab-guard] " + msg, flush=True)
+
+    sfile = state_path(args.state_file)
+    cfile = command_path(args.state_file)
+    # 守护进程每轮都会刷新状态文件。它活着的时候绝对不能自己再 NewSession：
+    # Firefox 只允许一个 Marionette 会话，抢过来会把正在守护的那条连接踢掉。
+    guard_alive = action in ("list", "close-strays", "focus-game") and state_fresh(
+        sfile, max(10.0, args.interval * 3)
+    )
+    if guard_alive:
+        cached = read_json(sfile) or {}
+        if action == "list":
+            print(json.dumps(cached, ensure_ascii=False, indent=2))
+            return 0
+        seq = "%d-%d" % (int(time.time()), os.getpid())
+        if not write_json(cfile, {"cmd": action, "id": seq, "ts": time.time()}):
+            print("[tab-guard] 守护在运行，但写不进命令文件：%s" % cfile, file=sys.stderr)
+            return 3
+        deadline = time.time() + 8.0
+        while time.time() < deadline:
+            now = read_json(sfile) or {}
+            done = now.get("lastCommand") or {}
+            if done.get("id") == seq:
+                print(json.dumps(done.get("result") or now, ensure_ascii=False, indent=2))
+                return 0 if (done.get("result") or {}).get("ok") else 3
+            time.sleep(0.25)
+        print("[tab-guard] 守护没有在 8 秒内响应命令；它可能正忙着或已退出", file=sys.stderr)
+        return 3
 
     client = MarionetteClient(port=args.port, verbose=args.verbose)
     try:
@@ -377,7 +537,27 @@ def main(argv=None):
     # ---- 守护循环 ----
     last_state = None
     failures = 0
+    handled_cmd = None
+    last_cmd = None
     while True:
+        # 外部命令（--close-strays / --focus-game）：命令行那边写命令文件，这里用现有
+        # 会话执行，避免第二个 Marionette 连接把守护踢掉。
+        pending_cmd = read_json(cfile) or {}
+        cmd_id = pending_cmd.get("id")
+        if cmd_id and cmd_id != handled_cmd:
+            handled_cmd = cmd_id
+            want = pending_cmd.get("cmd")
+            if want in ("close-strays", "focus-game"):
+                try:
+                    result = parse_status(client.execute(build_script(hosts, args.url, want)))
+                    last_cmd = {"id": cmd_id, "cmd": want, "result": result}
+                    log(
+                        "外部命令 %s 完成：标签 %d 个%s"
+                        % (want, result.get("count", 0), "，已切回云游戏" if want == "focus-game" else "")
+                    )
+                except MarionetteError as exc:
+                    last_cmd = {"id": cmd_id, "cmd": want, "result": {"ok": False, "err": str(exc)}}
+                    log("外部命令 %s 失败：%s" % (want, exc))
         try:
             status = parse_status(client.execute(script))
         except MarionetteError as exc:
@@ -393,26 +573,36 @@ def main(argv=None):
             log("浏览器侧返回失败：%s" % json.dumps(status, ensure_ascii=False))
             time.sleep(args.interval)
             continue
+        payload = dict(status)
+        payload["ts"] = time.time()
+        payload["pid"] = os.getpid()
+        payload["interval"] = args.interval
+        if last_cmd is not None:
+            payload["lastCommand"] = last_cmd
+        write_json(sfile, payload)
         state = (
             status.get("count"),
             status.get("gameFound"),
             status.get("created"),
+            status.get("collapsed"),
             status.get("activeIndex"),
             status.get("blocked"),
+            status.get("respectUser"),
         )
         if state != last_state:
             last_state = state
             log(
-                "守护中：标签 %d 个，云游戏标签%s，当前第 %d 个，累计拦截误关 %d 次"
+                "守护中：标签 %d 个，云游戏标签%s%s，当前第 %d 个，累计拦截误关 %d 次%s"
                 % (
                     status.get("count", 0),
                     "在线" if status.get("gameFound") else "缺失→重建",
+                    "，折叠重复页 %d 个" % status.get("collapsed") if status.get("collapsed") else "",
                     (status.get("activeIndex") or 0) + 1,
                     status.get("blocked", 0),
+                    "，已尊重用户取消固定" if status.get("respectUser") else "",
                 )
             )
         time.sleep(args.interval)
-
 
 if __name__ == "__main__":
     try:

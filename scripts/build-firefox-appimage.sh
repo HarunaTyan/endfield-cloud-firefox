@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.0.12}"
+VERSION="${ENDFIELD_VERSION:-1.0.13}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"
@@ -25,6 +25,8 @@ mkdir -p "$APPDIR/usr/share/endfield-firefox/profile"
 cp -a "$ROOT/firefox/profile/." "$APPDIR/usr/share/endfield-firefox/profile/"
 cp -a "$ROOT/scripts/launch-firefox.sh" "$APPDIR/usr/share/endfield-firefox/launch-firefox.sh"
 cp -a "$ROOT/scripts/tab-guard.py" "$APPDIR/usr/share/endfield-firefox/tab-guard.py"
+# 打包前清掉 Python 字节码缓存，别让 __pycache__ 混进 AppImage
+find "$APPDIR" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 cp -a "$ROOT/firefox/appimage/AppRun" "$APPDIR/AppRun"
 cp -a "$ROOT/firefox/appimage/endfield-cloud-firefox.desktop" "$APPDIR/endfield-cloud-firefox.desktop"
 cp -a "$ROOT/resources/icons/512x512.png" "$APPDIR/endfield-cloud-firefox.png"

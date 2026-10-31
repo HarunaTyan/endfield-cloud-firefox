@@ -183,7 +183,8 @@ start_tab_guard() {
     return 0
   fi
   # 后台守护：与 Firefox 的连接断开（浏览器退出）后自行结束。
-  python3 "$GUARD_SCRIPT" --watch --port "$MARIONETTE_PORT" --url "$URL" >>"$LOG_FILE" 2>&1 &
+  python3 "$GUARD_SCRIPT" --watch --port "$MARIONETTE_PORT" --url "$URL" \
+    --state-file "$RUNTIME_BASE/tab-guard-state.json" >>"$LOG_FILE" 2>&1 &
   GUARD_ACTIVE=1
   log "tab-guard: started (pid $!, port $MARIONETTE_PORT)"
   return 0
@@ -194,7 +195,9 @@ start_tab_guard() {
 # ---------- 组装命令 ----------
 # 注意顺序：--marionette 必须在 --profile 之前，否则会被 --profile 当成参数值吃掉。
 FF_ARGS="--no-remote --new-instance"
-[ "$GUARD_ACTIVE" = "1" ] && FF_ARGS="$FF_ARGS --marionette"
+# -remote-allow-system-access：Firefox 138 起，Marionette 切 chrome 上下文必须带这个，
+# 否则 Marionette:SetContext 一律报 “System access is required”。端口只监听回环。
+[ "$GUARD_ACTIVE" = "1" ] && FF_ARGS="$FF_ARGS --marionette -remote-allow-system-access"
 FF_ARGS="$FF_ARGS --profile"
 case "$FIREFOX_KIND" in
   flatpak)

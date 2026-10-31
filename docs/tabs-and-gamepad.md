@@ -1,14 +1,20 @@
 # 标签页与手柄映射
 
 云游戏外壳最怕的一种卡死：游戏里误触手柄/触控板打开别的网页，云游戏被挤到后台标签页，
-而页面是 kiosk 全屏、没有标签栏，回不去。这篇文档说明外壳提供的两层机制，以及手柄怎么配。
+而窗口是全屏、没有标签栏，回不去。这篇文档说明外壳提供的两层机制，以及手柄怎么配。
+
+> **先认一件事：云游戏页自己会开两个同名标签。** 入口 `/cloud` 是登录页，点「开始游戏」
+> 之后页面会**新开**一个同样是 `/cloud`、同样标题的标签，那个才是游戏本体。
+> 所以标签栏里出现两个一样的网页是页面自己的行为，不是外壳重复启动；
+> v1.0.13 起窗口化模式保留标签栏，守护也会把旧的那个登录页折叠掉，只留游戏页。
+
 
 ## 1. 两层机制
 
 | 层 | 手段 | 解决什么 |
 |---|---|---|
 | 第一层 | Firefox 原生快捷键 | 切换、关闭、恢复标签页 |
-| 第二层 | `scripts/tab-guard.py`（Marionette 守护） | 云游戏标签页**关不掉**、消失后**自动重建**、一键清场 |
+| 第二层 | `scripts/tab-guard.py`（Marionette 守护） | 云游戏标签页**关不掉**、重复页**自动折叠**、消失后**自动重建**、一键清场 |
 
 第一层不依赖任何东西，`Ctrl+Tab` 在 kiosk 全屏下照常工作。
 第二层由启动器自动拉起，起不来也不影响游戏。
@@ -33,17 +39,27 @@
 ## 3. 守护做了什么
 
 `scripts/tab-guard.py` 通过 Firefox 内置的 Marionette 协议（`127.0.0.1:2828`）连进浏览器，
-在 **chrome 权限上下文**里做三件事。
+在 **chrome 权限上下文**里做四件事。
 
 > 名词澄清：这里的 **chrome 不是 Google Chrome**，而是 Firefox/Mozilla 的「浏览器界面层」——
 > 即标签栏、工具栏、`gBrowser` 这些浏览器自身的部件（所以 profile 里的样式表才叫 `chrome/userChrome.css`）。
 > 与之相对的是 **content 上下文**，也就是网页本身能碰到的范围。
-> 关标签页的 API 只在 chrome 层，所以守护必须 `WebDriver:SetContext("chrome")` 才能拿到。
+> 关标签页的 API 只在 chrome 层，所以守护必须切到 chrome 上下文才能拿到。
+> 切上下文的命令名随版本变过：Firefox 138 之后是 `Marionette:SetContext`，且必须带启动参数
+> `-remote-allow-system-access`；更早的版本才叫 `WebDriver:SetContext`。守护两个都试，
+> 启动器在有守护时自动加那个参数。
 
-1. **固定**：把云游戏标签页 `pinTab`，钉在标签栏第一位（`Ctrl+1` 因此恒定指向它）。
-2. **拦截**：给 `gBrowser.removeTab` / `gBrowser.removeCurrentTab` 打补丁，
+1. **折叠重复页**：发现两个以上云游戏标签（登录页 + 游戏页）时，保留**最新**的那个、
+   关掉旧的，再把留下的这页固定。这样标签栏里只剩一个游戏页，`Ctrl+1` 指的就是它。
+2. **固定**：把游戏页 `pinTab`，钉在标签栏第一位。
+   **你手动取消固定之后它不再抢回来**（本次会话内），不会跟用户抢控制权。
+3. **拦截**：给 `gBrowser.removeTab` / `gBrowser.removeCurrentTab` 打补丁，
    目标标签是云游戏时直接返回，`Ctrl+W`、`Ctrl+F4`、标签栏上的关闭按钮全部无效；其他标签照常关。
-3. **自愈**：每 3 秒巡检一次，云游戏标签页不在（崩溃恢复、外部脚本、意外）就重建并切回。
+   > 原生 pinned 标签本来就会拦 `Ctrl+W`，所以补丁主要兜「关闭按钮 / 中键 / 别的扩展调 removeTab」，
+   > `blocked` 计数不涨不代表补丁没生效。
+4. **自愈**：每 3 秒巡检一次；云游戏标签页真的不在时才重建并切回。
+   会话恢复是懒加载的（标签还在但 URL 是 `about:blank`），这种情况**不会**再开一页，
+   外加 `user.js` 里关掉了 `browser.sessionstore.restore_on_demand`，从根上避免重复页。
 
 启动器只有在**守护真的要跑**时才给 Firefox 加 `--marionette`，所以关掉守护就不会开端口。
 
@@ -53,11 +69,20 @@
 python3 scripts/tab-guard.py --list           # 列出标签页（JSON：序号、标题、域名、是否固定、是否当前）
 python3 scripts/tab-guard.py --close-strays   # 关掉除云游戏外的全部标签，并切回云游戏
 python3 scripts/tab-guard.py --focus-game     # 只切回云游戏标签
-python3 scripts/tab-guard.py --once           # 执行一次「固定 + 打补丁 + 自愈」
+python3 scripts/tab-guard.py --once           # 执行一次「折叠 + 固定 + 打补丁 + 自愈」
 python3 scripts/tab-guard.py --watch          # 持续守护（启动器用的就是这个）
 ```
 
 退出码：`0` 正常（或浏览器已退出）、`2` 连不上 Marionette、`3` 浏览器侧执行失败。
+
+**守护在跑的时候也可以直接用上面三条只读/控制命令。** Firefox 只允许一个 Marionette 会话，
+第二个连接会把守护踢掉，所以脚本走了另一条路：
+
+- 守护每轮把状态写到 `tab-guard-state.json`（默认在 profile 同级目录）。`--list` 只要看到这份文件
+  是新鲜的（3 个巡检周期内）就直接打印它，**不碰 Marionette**；
+- `--close-strays` / `--focus-game` 写一条命令到 `tab-guard-cmd.json`，由守护用现有会话执行，
+  再把结果写回状态文件；命令行这边最多等 8 秒。
+- 守护没在跑时，三条命令照旧直接连 Marionette。
 
 ### 开关
 
@@ -67,6 +92,7 @@ python3 scripts/tab-guard.py --watch          # 持续守护（启动器用的�
 | `ENDFIELD_MARIONETTE_PORT` | `2828` | 端口；改了要同时给 Firefox 设 `marionette.port` |
 | `ENDFIELD_GAME_URL` | `https://endfield.hypergryph.com/cloud` | 自愈时重建用的地址 |
 | `ENDFIELD_GAME_HOST` | `endfield.hypergryph.com` | 认哪个域名算云游戏，逗号分隔可加 |
+| `ENDFIELD_STATE_FILE` | `~/.var/app/org.mozilla.firefox/endfield-cloud/tab-guard-state.json` | 状态文件落点；命令行用同一个值才能读到守护的状态 |
 
 ## 4. Steam 手柄映射
 
