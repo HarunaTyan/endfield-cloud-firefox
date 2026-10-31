@@ -148,7 +148,7 @@ case "$BACKEND" in wayland|x11) ;; *) BACKEND="wayland";; esac
 # XWayland 后端需要 DISPLAY；游戏模式下 Steam 一般已注入 :0，缺了兜底。
 if [ "$BACKEND" = "x11" ]; then export DISPLAY="${DISPLAY:-:0}"; fi
 
-# ---------- 标签页守护（锁定云游戏标签页；详见 docs/tabs-and-gamepad.md）----------
+# ---------- 标签页守护（锁定云游戏标签页）----------
 # 只有守护真的能跑，才给 Firefox 加 --marionette；关掉守护就不开端口。
 GUARD_ENABLED="${ENDFIELD_TAB_GUARD:-1}"
 MARIONETTE_PORT="${ENDFIELD_MARIONETTE_PORT:-2828}"

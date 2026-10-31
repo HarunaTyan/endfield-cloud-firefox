@@ -61,8 +61,8 @@ user_pref("ui.key.contentAccess", 0);
 user_pref("browser.toolbars.keyboard_navigation", false);
 
 // ==== 标签页：切换 / 关闭 / 防误关 ====
-// 详解见 docs/tabs-and-gamepad.md。快捷键由 Firefox 原生处理，锁定由启动器拉起的
-// scripts/tab-guard.py 负责；这里只放让原生行为更安全的开关。
+// 快捷键由 Firefox 原生处理，锁定由启动器拉起的 scripts/tab-guard.py 负责；
+// 这里只放让原生行为更安全的开关。
 // 关掉最后一个标签不连窗口一起关：误按 Ctrl+W 不会把整个 shell 关掉。
 user_pref("browser.tabs.closeWindowWithLastTab", false);
 // 页面里点开的链接在后台打开：云游戏标签页不会被抢走聚焦，误触时画面不中断。

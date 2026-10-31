@@ -35,7 +35,7 @@ python3 scripts/tab-guard.py --port 2928 --once
 分帧、握手、`WebDriver:SetContext(chrome)`、`WebDriver:ExecuteScript(sandbox=system)` 序列没写错。
 
 **它验证不了**：Firefox 实际会不会接受这些命令、`gBrowser` 行为是否如预期 ——
-那部分要在机器上用 `python3 scripts/tab-guard.py --list` 自测（见 `docs/tabs-and-gamepad.md`）。
+那部分要在机器上用 `python3 scripts/tab-guard.py --list` 自测。
 
 ## 3. 启动器
 

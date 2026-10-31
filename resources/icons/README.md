@@ -17,4 +17,4 @@ sh scripts/build-firefox-appimage.sh
 
 ## 版权
 
-`icon.svg` 为本项目原创几何图标，不含官方角色、徽标或官方美术资源。
+`icon.svg` 为本项目原创几何图标，不含官方角色或徽标。

@@ -3,7 +3,7 @@
 用 Flatpak `org.mozilla.firefox` 加载《明日方舟：终末地》官方云游戏页的轻量外壳。
 面向 **Steam Deck 游戏模式（gamescope，无桌面）**：作为 Steam「非 Steam 游戏」启动，手柄直接操作。
 
-> 非官方项目，与 Hypergryph / Gryphline 无关；不包含游戏客户端、游戏数据或官方美术资源。请遵守游戏官方用户协议。
+> 非官方项目，与鹰角网络（Hypergryph）不存在隶属或授权关系。请遵守游戏官方用户协议。
 
 ## 文件
 
@@ -65,7 +65,6 @@ python3 scripts/steam-shortcut.py \
 （`Ctrl+W` 在云游戏标签上无效），消失后自动重建。
 
 `ENDFIELD_TAB_GUARD=0` 可关闭守护；此时启动器也不会给 Firefox 加 `--marionette`。
-原理、Steam 手柄键位与排错见 [../docs/tabs-and-gamepad.md](../docs/tabs-and-gamepad.md)。
 
 ## X11 与手柄
 
