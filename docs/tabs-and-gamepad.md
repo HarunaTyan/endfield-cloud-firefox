@@ -33,7 +33,12 @@
 ## 3. 守护做了什么
 
 `scripts/tab-guard.py` 通过 Firefox 内置的 Marionette 协议（`127.0.0.1:2828`）连进浏览器，
-在 chrome 权限上下文里做三件事：
+在 **chrome 权限上下文**里做三件事。
+
+> 名词澄清：这里的 **chrome 不是 Google Chrome**，而是 Firefox/Mozilla 的「浏览器界面层」——
+> 即标签栏、工具栏、`gBrowser` 这些浏览器自身的部件（所以 profile 里的样式表才叫 `chrome/userChrome.css`）。
+> 与之相对的是 **content 上下文**，也就是网页本身能碰到的范围。
+> 关标签页的 API 只在 chrome 层，所以守护必须 `WebDriver:SetContext("chrome")` 才能拿到。
 
 1. **固定**：把云游戏标签页 `pinTab`，钉在标签栏第一位（`Ctrl+1` 因此恒定指向它）。
 2. **拦截**：给 `gBrowser.removeTab` / `gBrowser.removeCurrentTab` 打补丁，

@@ -15,6 +15,9 @@
 只监听本机回环），在 chrome 权限上下文里给 gBrowser.removeTab /
 removeCurrentTab 打补丁，只拦截云游戏标签，其他标签照常关闭。
 
+注意：这里的 "chrome" 是 Mozilla 的叫法（浏览器界面层：标签栏/工具栏/gBrowser），
+与 Google Chrome 无关；网页所在的 content 上下文碰不到这些接口。
+
 不依赖任何第三方 Python 包（SteamOS 自带 python3 即可）。
 
 用法
