@@ -3,10 +3,12 @@
 云游戏外壳最怕的一种卡死：游戏里误触手柄/触控板打开别的网页，云游戏被挤到后台标签页，
 而窗口是全屏、没有标签栏，回不去。这篇文档说明外壳提供的两层机制，以及手柄怎么配。
 
-> **先认一件事：云游戏页自己会开两个同名标签。** 入口 `/cloud` 是登录页，点「开始游戏」
-> 之后页面会**新开**一个同样是 `/cloud`、同样标题的标签，那个才是游戏本体。
-> 所以标签栏里出现两个一样的网页是页面自己的行为，不是外壳重复启动；
-> v1.0.13 起窗口化模式保留标签栏，守护也会把旧的那个登录页折叠掉，只留游戏页。
+> **先认一件事：经常会有两个同名的云游戏标签。** 两页 URL 都是 `/cloud`、标题也一样，
+> 其中一页是登录页、另一页才是游戏本体，**光看 URL 和标题分不出来**。
+> 外壳不猜：默认**不关任何标签、也不自动固定**，只在恰好一页云游戏页时才替用户钉住。
+> 有两个时 `--list` 会给 `"ambiguous": true`，日志写「有 2 个同名云游戏页，未自动固定」，
+> 由用户自己决定留着哪一页（关掉另一页后，下一次启动就只剩一页）。
+> 想让外壳替你折叠，设 `ENDFIELD_TAB_GUARD_COLLAPSE=1`（会保留最近打开的那一页）。
 
 
 ## 1. 两层机制
@@ -49,8 +51,9 @@
 > `-remote-allow-system-access`；更早的版本才叫 `WebDriver:SetContext`。守护两个都试，
 > 启动器在有守护时自动加那个参数。
 
-1. **折叠重复页**：发现两个以上云游戏标签（登录页 + 游戏页）时，保留**最新**的那个、
-   关掉旧的，再把留下的这页固定。这样标签栏里只剩一个游戏页，`Ctrl+1` 指的就是它。
+1. **只在没有歧义时动手**：恰好一个云游戏标签时才固定它。两个以上时只报告
+   （`ambiguous: true`），不关、不钉——自动关有把正在玩的那页关掉的风险。
+   需要折叠就显式开 `ENDFIELD_TAB_GUARD_COLLAPSE=1`，此时保留**最新**打开的那页。
 2. **固定**：把游戏页 `pinTab`，钉在标签栏第一位。
    **你手动取消固定之后它不再抢回来**（本次会话内），不会跟用户抢控制权。
 3. **拦截**：给 `gBrowser.removeTab` / `gBrowser.removeCurrentTab` 打补丁，
@@ -92,6 +95,7 @@ python3 scripts/tab-guard.py --watch          # 持续守护（启动器用的�
 | `ENDFIELD_MARIONETTE_PORT` | `2828` | 端口；改了要同时给 Firefox 设 `marionette.port` |
 | `ENDFIELD_GAME_URL` | `https://endfield.hypergryph.com/cloud` | 自愈时重建用的地址 |
 | `ENDFIELD_GAME_HOST` | `endfield.hypergryph.com` | 认哪个域名算云游戏，逗号分隔可加 |
+| `ENDFIELD_TAB_GUARD_COLLAPSE` | 关闭 | 设 `1` 才把重复的云游戏页折叠成最新那一页 |
 | `ENDFIELD_STATE_FILE` | `~/.var/app/org.mozilla.firefox/endfield-cloud/tab-guard-state.json` | 状态文件落点；命令行用同一个值才能读到守护的状态 |
 
 ## 4. Steam 手柄映射

@@ -21,11 +21,12 @@ if (end < 0) throw new Error("JS_TEMPLATE 没有结束标记");
 
 const template = py.slice(body, end);
 
-function buildScript(action) {
+function buildScript(action, collapse = false) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
-    .replace("%(action)s", JSON.stringify(action));
+    .replace("%(action)s", JSON.stringify(action))
+    .replace("%(collapse)s", collapse ? "true" : "false");
 }
 
 function mkTab(url, pinned = false, pending = false) {
@@ -60,13 +61,13 @@ function mkBrowser(tabs, selectedIdx = 0) {
   return gB;
 }
 
-function run(action, gB, reuse) {
+function run(action, gB, reuse, collapse = false) {
   const win = reuse || { gBrowser: gB };
   globalThis.Services = {
     wm: { getMostRecentWindow: () => win },
     scriptSecurityManager: { getSystemPrincipal: () => "SYSTEM" },
   };
-  return new Function("window", buildScript(action))(win);
+  return new Function("window", buildScript(action, collapse))(win);
 }
 
 let pass = 0;
@@ -144,10 +145,19 @@ function check(name, cond, detail = "") {
   check("no-window", st.ok === false && st.err === "no-browser-window", JSON.stringify(st));
 }
 
-// 7) 页面自己新开同名 /cloud 页（登录页 + 游戏页）→ 折叠成最新那一页
+// 7a) 默认：两个同名 /cloud 页不折叠、不自动固定（分不清哪个是游戏）
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
   const st = run("once", gB);
+  check("ambig.no-collapse", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
+  check("ambig.flag", st.ambiguous === true, "ambiguous=" + st.ambiguous);
+  check("ambig.untouched", gB.tabs[1].pinned === false);
+}
+
+// 7b) ENDFIELD_TAB_GUARD_COLLAPSE=1 时才折叠成最新那一页
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
+  const st = run("once", gB, null, true);
   check("dup.collapsed", st.collapsed === 1, "collapsed=" + st.collapsed);
   check("dup.only-one-cloud", gB.tabs.filter((t) => t.label === GAME).length === 1,
     "cloud=" + gB.tabs.filter((t) => t.label === GAME).length);

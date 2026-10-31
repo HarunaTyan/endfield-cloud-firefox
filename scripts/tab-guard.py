@@ -220,6 +220,7 @@ class MarionetteClient:
 JS_TEMPLATE = r"""const HOSTS = %(hosts)s;
 const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
+const COLLAPSE = %(collapse)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -346,9 +347,10 @@ if (MODE_ACTION === "close-strays") {
   game = clouds.length ? clouds[clouds.length - 1] : null;
 }
 
-if (!ONLY_LIST && MODE_ACTION !== "close-strays" && clouds.length >= 2) {
-  // 页面点「开始游戏」时自己会新开一个同名 /cloud 页，旧的那个是登录页。
-  // 只保留最新的一页，其余折叠掉 —— 用户在标签栏里就不会看到两个一样的网页。
+if (!ONLY_LIST && COLLAPSE && MODE_ACTION !== "close-strays" && clouds.length >= 2) {
+  // 可选：把重复的 /cloud 页折叠成最新那一页。默认关闭 —— 两个页面同 URL 同标题，
+  // 光凭 URL 分不出哪个才是真正进游戏的，自动关有风险（可能关掉正在玩的那页）。
+  // 要开就设 ENDFIELD_TAB_GUARD_COLLAPSE=1。
   const keep = clouds[clouds.length - 1];
   for (const t of clouds) {
     if (t === keep) continue;
@@ -383,7 +385,11 @@ if (!game && !ONLY_LIST) {
   }
 }
 
-if (game && MODE_ACTION !== "list") {
+// 两个以上云游戏页时「哪个是游戏」无法凭 URL 判定 ⇒ 不自动固定，把决定权留给用户。
+clouds = cloudTabs();
+const ambiguous = clouds.length > 1;
+
+if (game && MODE_ACTION !== "list" && !(ambiguous && MODE_ACTION !== "close-strays")) {
   if (!game.pinned && !ST.respectUser) {
     try { gB.pinTab(game); ST.selfPinned = game; } catch (e) {}
   }
@@ -410,6 +416,7 @@ return {
   gameFound: !!game,
   created: created,
   collapsed: collapsed,
+  ambiguous: ambiguous,
   blocked: ST.blocked,
   respectUser: !!ST.respectUser,
   count: tabs.length,
@@ -419,11 +426,12 @@ return {
 """
 
 
-def build_script(hosts, url, action):
+def build_script(hosts, url, action, collapse=False):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
         "action": json.dumps(action),
+        "collapse": "true" if collapse else "false",
     }
 
 
@@ -439,6 +447,8 @@ def main(argv=None):
     ap.add_argument("--url", default=os.environ.get("ENDFIELD_GAME_URL", DEFAULT_URL))
     ap.add_argument("--host", action="append", default=None, help="云游戏域名，可重复")
     ap.add_argument("--watch", action="store_true", help="持续守护（启动器用）")
+    ap.add_argument("--collapse", action="store_true",
+                    help="把重复的云游戏页折叠成最新那一页（默认关，见 ENDFIELD_TAB_GUARD_COLLAPSE）")
     ap.add_argument("--state-file", default=None,
                     help="守护把状态写到这个文件；--list 在守护运行时直接读它")
     ap.add_argument("--interval", type=float, default=3.0, help="守护轮询间隔秒，默认 3")
@@ -468,7 +478,8 @@ def main(argv=None):
     else:
         action = "once"
 
-    script = build_script(hosts, args.url, "list" if action == "list" else action)
+    collapse = bool(args.collapse) or os.environ.get("ENDFIELD_TAB_GUARD_COLLAPSE", "").strip() == "1"
+    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse)
 
     def log(msg):
         if not args.quiet:
@@ -549,7 +560,7 @@ def main(argv=None):
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
-                    result = parse_status(client.execute(build_script(hosts, args.url, want)))
+                    result = parse_status(client.execute(build_script(hosts, args.url, want, collapse)))
                     last_cmd = {"id": cmd_id, "cmd": want, "result": result}
                     log(
                         "外部命令 %s 完成：标签 %d 个%s"
@@ -600,6 +611,7 @@ def main(argv=None):
                     (status.get("activeIndex") or 0) + 1,
                     status.get("blocked", 0),
                     "，已尊重用户取消固定" if status.get("respectUser") else "",
+                    "，注意：有 %d 个同名云游戏页，未自动固定" % status.get("ambiguous") if status.get("ambiguous") else "",
                 )
             )
         time.sleep(args.interval)
