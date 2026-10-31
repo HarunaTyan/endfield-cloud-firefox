@@ -91,6 +91,7 @@ sh -n scripts/launch-firefox.sh
 sh -n scripts/build-firefox-appimage.sh
 sh -n firefox/appimage/AppRun
 python3 -m py_compile scripts/tab-guard.py
+node tests/tab-guard-logic.mjs          # 守护的浏览器侧逻辑（不需要 Firefox）
 DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
 sh scripts/build-firefox-appimage.sh
 ```

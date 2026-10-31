@@ -14,7 +14,10 @@
   多留 12 个可恢复标签、`Ctrl+Tab` 按顺序切换）。
 - **Steam 手柄映射文档** `docs/tabs-and-gamepad.md`：在现有 GAMEPAD / DESKTOP 两套操作集上，
   用空闲的 L4 / L5 / R4 加标签页键位，不占用游戏内按键。
-- **中文发版**：Release 标题与正文改为中文模板，`CHANGELOG.md` 为中文变更记录。
+- **中文发版**：Release 标题与正文改为中文，`.github/release.yml` 用中文分类名，
+  并在 `docs/PUBLISHING.md` 写明「CI 出资产、人补中文正文」的流程；新增中文 `CHANGELOG.md`。
+- **离线回归测试** `tests/`：守护的浏览器侧逻辑（`node tests/tab-guard-logic.mjs`，21 条断言）
+  与 Marionette 通信层（`python3 tests/marionette-mock.py`），都不需要 Deck。
 
 ### 改进
 

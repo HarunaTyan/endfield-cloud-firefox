@@ -182,6 +182,7 @@ sh scripts/build-firefox-appimage.sh
 - [docs/tabs-and-gamepad.md](docs/tabs-and-gamepad.md) — 标签页守护原理、Steam 手柄映射、排错
 - [docs/PUBLISHING.md](docs/PUBLISHING.md) — 公开发布检查清单
 - [CHANGELOG.md](CHANGELOG.md) — 版本变更（中文）
+- [tests/](tests/) — 守护逻辑与 Marionette 协议的离线回归（`node` / `python3`，不需要 Deck）
 
 ## 安全与合规
 
