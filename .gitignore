@@ -32,3 +32,11 @@ resources/icons/_unused/
 UPLOAD_GITHUB.txt
 LOCAL_*.txt
 NOTES_*.md
+
+# 运行时 profile 数据：native 模式会把 prefs.js / cookies / cache2 写进 firefox/profile，
+# 只保留要随包发布的两样（预置设置与界面样式）
+/firefox/profile/*
+!/firefox/profile/user.js
+!/firefox/profile/chrome/
+/firefox/profile/chrome/*
+!/firefox/profile/chrome/userChrome.css
