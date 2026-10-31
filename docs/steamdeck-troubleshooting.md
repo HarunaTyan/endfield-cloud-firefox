@@ -59,9 +59,13 @@ flatpak override --user --device=all org.mozilla.firefox
 
 ## 5. 画质 / 发热
 
-Firefox 走的是 **WebRTC H264** 软解（页面按 UA 把 Firefox 排除在 WebCodecs 通道外），
-1080p60 在 Deck 上会有发热与掉帧。缓解办法：云游戏页里把画质/帧率降到 720p60 或 1080p30。
-原因和「什么情况该换 Chromium 方案」见 [gecko-vs-electron.md](gecko-vs-electron.md)。
+Firefox 走的是 **WebRTC H264** 软解（页面按 UA 把 Firefox 排除在 WebCodecs 通道外，
+而 WebRTC 里 Firefox 不实现 H265），1080p60 在 Deck 上会有发热与掉帧。
+缓解办法：云游戏页里把画质/帧率降到 720p60 或 1080p30。
+
+注意：Firefox 的 H.265 支持是 `<video>` 播放那套（134/136/137 起按平台陆续开），
+跟云游戏的串流通道不是一回事；把 UA 冒充成 Chrome 也只会走进解不了的 WebCodecs。
+详见 [gecko-vs-electron.md](gecko-vs-electron.md)「为什么拿不到 H.265」。
 
 ## 6. 声音：手柄静音 / 调音量为什么没有
 
