@@ -22,25 +22,25 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
 ## 常见问题
 
-> **打开其他网页后如何回到云游戏？**
+- **不慎跳转其他网页后如何回到云游戏？**
 
-绑定了 `Ctrl+1` 的按键可切回云游戏标签页。`Ctrl+W` 用于关闭误开的网页，云游戏标签页本身无法关闭。
+  绑定了 `Ctrl+1` 的按键可切回云游戏标签页。`Ctrl+W` 用于关闭误开的网页，云游戏标签页本身无法关闭。
 
-> **`.AppImage` 双击或从 Steam 启动没有反应**
+- **`.AppImage` 双击或从 Steam 启动没有反应**
 
-Linux 下载的文件不带执行权限。改用同版本的 `.AppImage.tar.gz` 解压（包内已带权限），或在提示中确认允许执行一次。
+  Linux 下载的文件不带执行权限。改用同版本的 `.AppImage.tar.gz` 解压（包内已带权限），或在提示中确认允许执行一次。
 
-> **Steam 条目改动文件名后会怎样**
+- **文件名可以修改吗？**
 
-Steam 按路径与文件名识别游戏，改动后会成为另一款游戏，手柄布局需要重新配置。建议固定为 `~/Applications/EndfieldCloud.AppImage`。
+  可以，但 Steam 按路径与文件名识别游戏，改动后会成为另一款游戏，手柄布局需要重新配置。建议固定为 `~/Applications/EndfieldCloud.AppImage` 后再添加。
 
-> **如何以全屏运行**
+- **如何以全屏运行**
 
-在启动项末尾追加 `--fullscreen`，Firefox 以 kiosk 模式启动，无窗口边框与浏览器界面。退出使用 `Alt+F4`；该模式下 Steam 覆盖层仍显示在最上层。
+  在启动项末尾追加 `--fullscreen`，Firefox 以 kiosk 模式启动，无窗口边框与浏览器界面。退出使用 `Alt+F4`；该模式下 Steam 覆盖层仍显示在最上层。
 
-> **如何升级**
+- **如何升级**
 
-下载新版本，覆盖 `~/Applications/EndfieldCloud.AppImage` 后重新运行。
+  下载新版本，覆盖 `~/Applications/EndfieldCloud.AppImage` 后重新运行。
 
 ## 声明
 
