@@ -10,12 +10,11 @@
   background-color: #000 !important;
 }
 
-/* 隐藏导航栏、书签栏、标题栏按钮区（窗口化时按 Alt 呼出菜单）
+/* 隐藏导航栏、书签栏、标题栏按钮区、标签栏（窗口化时按 Alt 呼出菜单）
  *
- * 标签栏**保留**：云游戏页点「开始游戏」会自己新开一个同名 /cloud 页，
- * 隐藏标签栏就看不出有两页，只会觉得「切不回去 / 卡死」。
- * 想要极简效果（确实不需要标签栏）再手动打开下面这行。 */
-/* #TabsToolbar { display: none !important; } */
+ * 标签栏可以隐藏，前提是重复的 /cloud 页已经被收敛成一页（tab-guard 负责）：
+ * 剩下的页只有一个，遮住标签栏也不会让人找不到当前在玩哪一页。 */
+#TabsToolbar { display: none !important; }
 #nav-bar { display: none !important; }
 #PersonalToolbar { display: none !important; }
 #titlebar { display: none !important; }

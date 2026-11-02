@@ -24,6 +24,10 @@ tar -xzf endfield-cloud-firefox-*.AppImage.tar.gz -C ~/Applications
 **打开其他网页后，怎么切回云游戏？**
 把某个按键绑定 `Ctrl+1`，按下即回到云游戏标签页；误开的网页按 `Ctrl+W` 关闭，云游戏标签页本身关不掉。
 
+**刚下载的 `.AppImage` 双击没反应，或从 Steam 启动失败？**
+Linux 下载来的文件不带执行权限。改用同一版本的 `.AppImage.tar.gz` 解压（包内已带权限），
+或双击一次 `.AppImage`，在提示里选择继续。
+
 **升级怎么办？**
 下载新版本，替换同一个文件后重新运行。
 
