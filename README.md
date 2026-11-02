@@ -26,9 +26,9 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
   绑定了 `Ctrl+1` 的按键可切回云游戏标签页。`Ctrl+W` 用于关闭误开的网页，云游戏标签页本身无法关闭。
 
-- **`.AppImage` 双击或从 Steam 启动没有反应**
+- **添加`.AppImage`后 从 Steam 启动没有反应？**
 
-  Linux 下载的文件不带执行权限。改用同版本的 `.AppImage.tar.gz` 解压（包内已带权限），或在提示中确认允许执行一次。
+  Linux 下载的文件不带执行权限。改用同版本的 `.AppImage.tar.gz` 解压（包内已带权限），或在双击提示中确认允许执行一次。
 
 - **文件名可以修改吗？**
 
