@@ -25,12 +25,13 @@ jobs:
         run: sh scripts/build-firefox-appimage.sh
 
       - name: Checksums
-        run: sha256sum dist/*.AppImage > dist/SHA256SUMS.txt
+        run: sha256sum dist/*.AppImage dist/*.tar.gz > dist/SHA256SUMS.txt
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.AppImage
+            dist/*.tar.gz
             dist/SHA256SUMS.txt
           generate_release_notes: true
