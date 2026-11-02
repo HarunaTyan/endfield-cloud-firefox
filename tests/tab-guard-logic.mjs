@@ -215,6 +215,20 @@ function check(name, cond, detail = "") {
   check("dup.protected", st.tabs.some((t) => t.protected === true && t.game === true));
 }
 
+// 7c) 游戏页在后台打开（loadInBackground=true 的现场）：
+//     活动页是登录页，新开的 /cloud 在后面。以「活动页」为准会误关游戏页，
+//     所以必须留最新的那一页，而不是留活动页。
+{
+  const login = mkTab(GAME);                  // 旧的 /cloud，活动
+  const gameTab = mkTab(GAME);                // 本次启动新开的 /cloud，在后台
+  const gB = mkBrowser([login, gameTab], 0);
+  const st = run("once", gB);
+  check("dupbg.kept-newest", gB.tabs.includes(gameTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("dupbg.closed-old", !gB.tabs.includes(login));
+  check("dupbg.pinned", gameTab.pinned === true);
+  check("dupbg.deduped", st.deduped === 1, "deduped=" + st.deduped);
+}
+
 // 7b) ENDFIELD_TAB_DEDUPE=0：不收敛，两个 /cloud 页都留着，且都能关
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);

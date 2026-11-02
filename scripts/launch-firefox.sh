@@ -32,6 +32,8 @@ DEFAULT_URL="https://endfield.hypergryph.com/cloud"
 EXIT_OK=0; EXIT_NO_FIREFOX=2; EXIT_PROFILE=3; EXIT_RUNNING=4
 
 mkdir -p "$RUNTIME_BASE" 2>/dev/null || true
+# 状态文件里有标签页地址与标题，目录只给本人
+chmod 700 "$RUNTIME_BASE" 2>/dev/null || true
 log() { [ "${ENDFIELD_LOG:-}" = "1" ] || [ -n "${IN_GAMESCOPE:-}" ] || return 0; echo "$@" >> "$LOG_FILE" 2>/dev/null; }
 die() { code=$1; shift; echo "[launch-firefox] $*" >&2; log "FATAL($code): $*"; exit "$code"; }
 
@@ -48,6 +50,11 @@ for arg in "$@"; do
   esac
 done
 case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) die "$EXIT_PROFILE" "无效 --window-mode: $WINDOW_MODE";; esac
+# 尺寸必须是正整数：非数字会把 word-split/通配符带进后面的命令
+case "$WIDTH" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 宽: $WIDTH";; esac
+case "$HEIGHT" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 高: $HEIGHT";; esac
+# URL 以 -- 开头会被 Firefox 当成启动参数（例如 --kiosk），只接受 http(s)
+case "$URL" in --*) die "$EXIT_PROFILE" "--url 不能以 -- 开头: $URL";; esac
 
 # ---------- Steam 游戏模式环境兜底（必须在 auto 判定之前）----------
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -104,11 +111,15 @@ sync_profile() {
   if [ ! -f "$REPO_PROFILE_DIR/user.js" ]; then die "$EXIT_PROFILE" "repo profile 缺失: $REPO_PROFILE_DIR/user.js"; fi
   mkdir -p "$RUNTIME_PROFILE/chrome" || die "$EXIT_PROFILE" "无法创建 $RUNTIME_PROFILE"
   # 只覆盖 user.js 与 chrome/;prefs.js(运行时状态)与 cookies.sqlite 等永不触碰
-  cp "$REPO_PROFILE_DIR/user.js" "$RUNTIME_PROFILE/user.js" || die "$EXIT_PROFILE" "复制 user.js 失败"
+  cp "$REPO_PROFILE_DIR/user.js" "$RUNTIME_PROFILE/user.js.tmp.$$" \
+    && mv -f "$RUNTIME_PROFILE/user.js.tmp.$$" "$RUNTIME_PROFILE/user.js" \
+    || die "$EXIT_PROFILE" "复制 user.js 失败"
   # chrome/ 内容按文件覆盖(删除 repo 已移除的旧文件不在本脚本职责内,文件集很小)
   for f in "$REPO_PROFILE_DIR"/chrome/*; do
     [ -f "$f" ] || continue
-    cp "$f" "$RUNTIME_PROFILE/chrome/" || die "$EXIT_PROFILE" "复制 chrome/$(basename "$f") 失败"
+    cp "$f" "$RUNTIME_PROFILE/chrome/.$(basename "$f").tmp.$$" \
+      && mv -f "$RUNTIME_PROFILE/chrome/.$(basename "$f").tmp.$$" "$RUNTIME_PROFILE/chrome/$(basename "$f")" \
+      || die "$EXIT_PROFILE" "复制 chrome/$(basename "$f") 失败"
   done
 }
 if [ "$FIREFOX_KIND" = "flatpak" ] || [ "$FORCE_PROFILE_SYNC" = "1" ]; then
@@ -151,11 +162,24 @@ if [ "$BACKEND" = "x11" ]; then export DISPLAY="${DISPLAY:-:0}"; fi
 # ---------- 标签页守护（锁定云游戏标签页）----------
 # 只有守护真的能跑，才给 Firefox 加 --marionette；关掉守护就不开端口。
 GUARD_ENABLED="${ENDFIELD_TAB_GUARD:-1}"
-MARIONETTE_PORT="${ENDFIELD_MARIONETTE_PORT:-2828}"
+# 端口默认随机：固定 2828 时，本机任何进程都能直接连上这条无认证的 Marionette 通道。
+# 想固定就显式给 ENDFIELD_MARIONETTE_PORT。
+pick_free_port() {
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()' 2>/dev/null
+}
+MARIONETTE_PORT="${ENDFIELD_MARIONETTE_PORT:-}"
+[ -n "$MARIONETTE_PORT" ] || MARIONETTE_PORT="$(pick_free_port || true)"
+case "$MARIONETTE_PORT" in ''|*[!0-9]*) MARIONETTE_PORT=2828 ;; esac
 GUARD_SCRIPT="${ENDFIELD_GUARD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/tab-guard.py}"
 GUARD_ACTIVE=0
 
 port_busy() {
+  case "$1" in ""|*[!0-9]*) return 1 ;; esac
   if command -v ss >/dev/null 2>&1; then
     ss -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]"
   elif command -v netstat >/dev/null 2>&1; then
@@ -192,6 +216,12 @@ start_tab_guard() {
 
 [ "${DRY_RUN:-0}" = "1" ] || start_tab_guard
 
+# 守护要跑时才写端口：user.js 每轮都由仓库覆盖，所以每次启动追加一行即可
+if [ "$GUARD_ACTIVE" = "1" ]; then
+  printf 'user_pref("marionette.port", %s);\n' "$MARIONETTE_PORT" >> "$RUNTIME_PROFILE/user.js" \
+    || echo "[launch-firefox] 警告：无法写入 marionette.port，守护可能连不上" >&2
+fi
+
 # ---------- 组装命令 ----------
 # 注意顺序：--marionette 必须在 --profile 之前，否则会被 --profile 当成参数值吃掉。
 FF_ARGS="--no-remote --new-instance"
@@ -207,9 +237,11 @@ case "$FIREFOX_KIND" in
       # --socket=x11 是让 Flatpak 真正挂载 X11 并注入 DISPLAY 的关键，
       # 只写 --env=DISPLAY 会被 Flatpak 的 Wayland 默认路径吃掉。
       ENV_ARGS="--socket=x11 --env=MOZ_ENABLE_WAYLAND=0 --env=DISPLAY=${DISPLAY:-:0}"
+      [ "$GUARD_ACTIVE" = "1" ] && ENV_ARGS="$ENV_ARGS --env=MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1"
       [ -n "${XAUTHORITY:-}" ] && ENV_ARGS="$ENV_ARGS --env=XAUTHORITY=$XAUTHORITY"
     else
       ENV_ARGS="--env=MOZ_ENABLE_WAYLAND=1"
+      [ "$GUARD_ACTIVE" = "1" ] && ENV_ARGS="$ENV_ARGS --env=MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1"
     fi
     ;;
   native)

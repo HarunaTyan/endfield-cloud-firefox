@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.1.2}"
+VERSION="${ENDFIELD_VERSION:-1.2.0}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"
@@ -15,11 +15,26 @@ OUT="$ROOT/dist/EndfieldCloud.AppImage"
 
 mkdir -p "$CACHE" "$ROOT/dist"
 if [ ! -x "$TOOL" ]; then
-  echo "[build-firefox-appimage] 下载 appimagetool…"
+  echo "[build-firefox-appimage] 下载 appimagetool 1.9.1…"
+  # 固定 tag 与 SHA-256：不能用 continuous，那是滚动分支，内容随时变，
+  # 且没有哈希校验就等于每次构建都在执行未知二进制。
+  AIT_TAG="1.9.1"
+  AIT_SHA256="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
   curl -fL --retry 2 --connect-timeout 15 \
-    -o "$TOOL" \
-    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+    -o "$TOOL.tmp" \
+    "https://github.com/AppImage/appimagetool/releases/download/$AIT_TAG/appimagetool-x86_64.AppImage"
+  GOT="$(sha256sum "$TOOL.tmp" | cut -d' ' -f1)"
+  if [ "$GOT" != "$AIT_SHA256" ]; then
+    rm -f "$TOOL.tmp"
+    echo "[build-firefox-appimage] appimagetool 校验失败: $GOT" >&2
+    exit 1
+  fi
+  mv "$TOOL.tmp" "$TOOL"
   chmod 755 "$TOOL"
+elif [ "$(sha256sum "$TOOL" | cut -d' ' -f1)" != "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0" ]; then
+  echo "[build-firefox-appimage] 缓存里的 appimagetool 校验失败，重新下载" >&2
+  rm -f "$TOOL"
+  exec "$0" "$@"
 fi
 
 rm -rf "$BUILD"

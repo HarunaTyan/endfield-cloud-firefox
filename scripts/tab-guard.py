@@ -80,13 +80,27 @@ def read_json(path):
 def write_json(path, payload):
     """原子替换：写临时文件再 rename，读的一方永远看不到半截 JSON。"""
     try:
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        directory = os.path.dirname(path) or "."
+        os.makedirs(directory, mode=0o700, exist_ok=True)
         temp = "%s.tmp-%d" % (path, os.getpid())
-        with open(temp, "w", encoding="utf-8") as fh:
+        # 文件里有全部标签的 URL 与标题，等同浏览历史；只留属主可读
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, ensure_ascii=False)
         os.replace(temp, path)
         return True
     except OSError:
+        return False
+
+
+def pid_alive(pid):
+    """只看进程在不在；权限不足也当作活着（那是别人的进程，不该抢会话）。"""
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, ValueError, TypeError):
         return False
 
 
@@ -104,7 +118,7 @@ class MarionetteError(Exception):
 class MarionetteClient:
     """极简 Marionette 客户端：只实现本脚本用到的三条命令。"""
 
-    def __init__(self, host="127.0.0.1", port=DEFAULT_PORT, timeout=15.0, verbose=False):
+    def __init__(self, host="127.0.0.1", port=DEFAULT_PORT, timeout=30.0, verbose=False):
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -115,12 +129,21 @@ class MarionetteClient:
         self.protocol = 0
 
     # ---- 底层收发 ----------------------------------------------------
+    MAX_MESSAGE = 16 * 1024 * 1024
+
     def _fill(self, need):
         while len(self._buf) < need:
-            chunk = self._sock.recv(65536)
+            try:
+                chunk = self._sock.recv(65536)
+            except socket.timeout:
+                raise MarionetteError("读取超时（%.0fs）" % self.timeout)
+            except OSError as exc:
+                raise MarionetteError("连接中断: %s" % exc)
             if not chunk:
                 raise MarionetteError("连接已断开")
             self._buf += chunk
+            if len(self._buf) > self.MAX_MESSAGE:
+                raise MarionetteError("对端发送的消息超过 16MB，断开")
 
     def _read_message(self):
         sep = self._buf.find(b":")
@@ -128,9 +151,12 @@ class MarionetteClient:
             self._fill(len(self._buf) + 1)
             sep = self._buf.find(b":")
         head = self._buf[:sep]
-        if not head.isdigit():
+        # 长度头只可能是十进制数字；超过 10 位（>9GB）直接判非法，避免 int() 抛 ValueError
+        if len(head) > 10 or not head.isdigit():
             raise MarionetteError("协议头异常: %r" % head[:32])
         length = int(head)
+        if length > self.MAX_MESSAGE:
+            raise MarionetteError("协议头声明 %d 字节，超过 16MB 上限" % length)
         self._fill(sep + 1 + length)
         payload = self._buf[sep + 1 : sep + 1 + length]
         self._buf = self._buf[sep + 1 + length :]
@@ -198,7 +224,13 @@ class MarionetteClient:
             except MarionetteError as exc:
                 last = exc
         if context == "chrome":
-            raise last
+            # 走到这里说明 system-access 没生效：不同版本叫 -remote-allow-system-access /
+            # --remote-enable-system-access，新版改看 MOZ_REMOTE_ALLOW_SYSTEM_ACCESS。
+            raise MarionetteError(
+                "无法切到 chrome 上下文（%s）。Firefox 需要以 system-access 启动："
+                "-remote-allow-system-access 或环境变量 MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1"
+                % last
+            )
 
     def execute(self, script):
         """在 chrome 上下文执行脚本，返回脚本的 JS 返回值。"""
@@ -382,11 +414,15 @@ if (MODE_ACTION === "close-strays") {
 }
 
 // 重复的 /cloud 页只留一页。登录页与游戏页同 URL 同标题，凭 URL 分不出谁是谁，
-// 但「用户当前看着的那一页」就是他要的 ⇒ 留活动页，其余关掉（绕过本文件的关闭拦截）。
+// 只能按时序判断：最新打开的那一页才是这次要玩的（绕过本文件的关闭拦截）。
 // 这一条同时修「第二次启动 = 固定页 + 新页」与「两页都关不掉」。
 if (!ONLY_LIST && DEDUPE && MODE_ACTION !== "list" && clouds.length > 1) {
-  const sel = gB.selectedTab;
-  let keep = (sel && isGame(sel)) ? sel : clouds[clouds.length - 1];
+  // 留最新打开的那页，不是「活动页」：点「开始游戏」时游戏页可能以后台标签打开
+  // （user.js 里 loadInBackground=true），那时活动页仍停在登录页，留活动页会关掉游戏本体。
+  let keep = clouds[0];
+  for (const t of clouds) {
+    if (gB.tabs.indexOf(t) > gB.tabs.indexOf(keep)) keep = t;
+  }
   for (const t of clouds) {
     if (t === keep) continue;
     if (hardRemove(t)) deduped += 1;
@@ -596,18 +632,33 @@ def main(argv=None):
         print("[tab-guard] 守护没有在 8 秒内响应命令；它可能正忙着或已退出", file=sys.stderr)
         return 3
 
+    if action == "once":
+        # 守护在跑时再 NewSession 会把它踢掉：只在这份 state 是活的守护写的才让位
+        recent = read_json(sfile) or {}
+        if recent.get("pid") and pid_alive(recent.get("pid")) and state_fresh(
+            sfile, max(10.0, args.interval * 3)
+        ):
+            print("[tab-guard] 守护正在运行，--once 已跳过（用 --list 查看状态）", file=sys.stderr)
+            return 0
+
     client = MarionetteClient(port=args.port, verbose=args.verbose)
     try:
         client.connect(wait_seconds=args.wait)
         client.new_session("chrome")
-    except MarionetteError as exc:
+    except (MarionetteError, OSError) as exc:
         print("[tab-guard] 无法接管浏览器：%s" % exc, file=sys.stderr, flush=True)
+        print(
+            "[tab-guard] 警告：标签页守护未生效。云游戏仍可正常游玩，"
+            "但 Ctrl+W 不再被拦截、标签页也不会自动固定。",
+            file=sys.stderr,
+            flush=True,
+        )
         return 2
 
     if action in ("list", "once", "close-strays", "focus-game"):
         try:
             status = parse_status(client.execute(script))
-        except MarionetteError as exc:
+        except (MarionetteError, OSError) as exc:
             print("[tab-guard] 执行失败：%s" % exc, file=sys.stderr, flush=True)
             return 3
         finally:
@@ -630,6 +681,8 @@ def main(argv=None):
         return 0
 
     # ---- 守护循环 ----
+    # 先落一次状态：CLI 靠文件 mtime 判活在，晚写会有一段“看起来守护不在”的窗口
+    write_json(sfile, {"ts": time.time(), "pid": os.getpid(), "starting": True})
     last_state = None
     failures = 0
     handled_cmd = None
@@ -641,6 +694,15 @@ def main(argv=None):
         cmd_id = pending_cmd.get("id")
         if cmd_id and cmd_id != handled_cmd:
             handled_cmd = cmd_id
+            # 上次会话遗留的命令（例如崩溃前写的）不重放：超过 60 秒一律丢弃
+            age = time.time() - float(pending_cmd.get("ts") or 0)
+            if age > 60.0:
+                log("丢弃陈旧的命令文件（%.0f 秒前写入）" % age)
+                try:
+                    os.remove(cfile)
+                except OSError:
+                    pass
+                continue
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
@@ -650,12 +712,16 @@ def main(argv=None):
                         "外部命令 %s 完成：标签 %d 个%s"
                         % (want, result.get("count", 0), "，已切回云游戏" if want == "focus-game" else "")
                     )
-                except MarionetteError as exc:
+                except (MarionetteError, OSError) as exc:
                     last_cmd = {"id": cmd_id, "cmd": want, "result": {"ok": False, "err": str(exc)}}
                     log("外部命令 %s 失败：%s" % (want, exc))
+                try:
+                    os.remove(cfile)
+                except OSError:
+                    pass
         try:
             status = parse_status(client.execute(script))
-        except MarionetteError as exc:
+        except (MarionetteError, OSError) as exc:
             failures += 1
             if failures >= 3:
                 log("浏览器已退出或失联，守护结束：%s" % exc)

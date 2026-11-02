@@ -19,6 +19,8 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
 3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
 
+仅用于个人 Steam Deck（单用户）。标签页守护会在本机回环开放一个无认证端口，不要在多用户机器上运行。
+
 
 ## 常见问题
 
