@@ -37,12 +37,13 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, collapse = false, blockKeys = true) {
+function buildScript(action, { dedupe = true, blockKeys = true, collapse = false } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
     .replace("%(action)s", JSON.stringify(action))
     .replace("%(collapse)s", collapse ? "true" : "false")
+    .replace("%(dedupe)s", dedupe ? "true" : "false")
     .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
@@ -88,14 +89,14 @@ function mkBrowser(tabs, selectedIdx = 0) {
   return gB;
 }
 
-function run(action, gB, reuse, collapse = false) {
+function run(action, gB, reuse, opts) {
   const win = reuse || mkWin(gB);
   LAST_WIN = win;
   globalThis.Services = {
     wm: { getMostRecentWindow: () => win },
     scriptSecurityManager: { getSystemPrincipal: () => "SYSTEM" },
   };
-  return new Function("window", buildScript(action, collapse))(win);
+  return new Function("window", buildScript(action, opts))(win);
 }
 
 let LAST_WIN = null;
@@ -197,25 +198,46 @@ function check(name, cond, detail = "") {
   check("no-window", st.ok === false && st.err === "no-browser-window", JSON.stringify(st));
 }
 
-// 7a) 默认：两个同名 /cloud 页不折叠、不自动固定（分不清哪个是游戏）
+// 7a) 第二次启动的现场：上次固定的 /cloud + 本次启动打开的 /cloud（活动）
+//     期望：只留活动那一页，并把它固定；别的标签不动
 {
-  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
+  const login = mkTab(GAME, true);            // 上次会话恢复的固定页
+  const gameTab = mkTab(GAME);                // 本次启动打开的页（活动）
+  const gB = mkBrowser([login, gameTab, mkTab(STRAY)], 1);
   const st = run("once", gB);
-  check("ambig.no-collapse", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
-  check("ambig.flag", st.ambiguous === true, "ambiguous=" + st.ambiguous);
-  check("ambig.untouched", gB.tabs[1].pinned === false);
-}
-
-// 7b) ENDFIELD_TAB_GUARD_COLLAPSE=1 时才折叠成最新那一页
-{
-  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
-  const st = run("once", gB, null, true);
-  check("dup.collapsed", st.collapsed === 1, "collapsed=" + st.collapsed);
   check("dup.only-one-cloud", gB.tabs.filter((t) => t.label === GAME).length === 1,
     "cloud=" + gB.tabs.filter((t) => t.label === GAME).length);
-  check("dup.kept-newest-pinned", gB.tabs[0].label === GAME && gB.tabs[0].pinned === true,
-    "tabs=" + gB.tabs.map((t) => t.label + (t.pinned ? "*" : "")).join("|"));
+  check("dup.kept-active", gB.tabs.includes(gameTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("dup.deduped", st.deduped === 1, "deduped=" + st.deduped);
+  check("dup.kept-pinned", gameTab.pinned === true);
+  check("dup.ambiguous-flag", st.ambiguous === true);
   check("dup.stray-kept", gB.tabs.some((t) => t.label === STRAY));
+  check("dup.protected", st.tabs.some((t) => t.protected === true && t.game === true));
+}
+
+// 7b) ENDFIELD_TAB_DEDUPE=0：不收敛，两个 /cloud 页都留着，且都能关
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
+  const st = run("once", gB, null, { dedupe: false });
+  check("nod.three-tabs", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
+  check("nod.deduped-zero", st.deduped === 0);
+  const before = gB.tabs.length;
+  gB.removeTab(gB.tabs[0]);                   // 非保护页：以前按 URL 会拦，现在应放行
+  check("nod.close-other-cloud", gB.tabs.length === before - 1 && gB.closed === 1,
+    "tabs=" + gB.tabs.length + " closed=" + gB.closed);
+}
+
+// 7c) 只保护当前页：非保护的同名 /cloud 页可以关，保护页关不掉
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab(STRAY)], 1);
+  run("once", gB);
+  const prot = gB.tabs.find((t) => t.pinned === true);
+  check("prot.exists", !!prot);
+  const other = gB.tabs.find((t) => t !== prot && t.label === STRAY);
+  gB.removeTab(other);
+  check("prot.close-stray", gB.tabs.includes(other) === false, "tabs=" + gB.tabs.length);
+  gB.removeTab(prot);
+  check("prot.block-self", gB.tabs.includes(prot) === true, "tabs=" + gB.tabs.length);
 }
 
 // 8) 会话恢复懒加载：pending 标签不会被当成「没有云游戏页」而再开一页

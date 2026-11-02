@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.0.16}"
+VERSION="${ENDFIELD_VERSION:-1.1.0}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"
@@ -39,7 +39,14 @@ rm -f "$OUT"
 ARCH=x86_64 "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
 chmod 755 "$OUT"
 
+# GitHub Release 的资产下载回来后是 644：可执行位不在 HTTP 里。
+# 用 tar.gz 把 mode 一起带走，用户解压即得 755，不必再 chmod。
+TARBALL="$OUT.tar.gz"
+rm -f "$TARBALL"
+tar -C "$ROOT/dist" -czf "$TARBALL" "$(basename "$OUT")"
+chmod 644 "$TARBALL"
+
 echo
 echo "[build-firefox-appimage] 产物: $OUT"
-ls -lh "$OUT"
-sha256sum "$OUT"
+ls -lh "$OUT" "$TARBALL"
+sha256sum "$OUT" "$TARBALL"

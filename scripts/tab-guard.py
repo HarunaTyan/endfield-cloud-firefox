@@ -222,6 +222,7 @@ const BLOCKED_KEYS = %(blocked_keys)s;
 const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
 const COLLAPSE = %(collapse)s;
+const DEDUPE = %(dedupe)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -296,6 +297,7 @@ const ST = (win.__endfieldTabGuard = win.__endfieldTabGuard || {
   since: Date.now(),
   hosts: HOSTS,
   selfPinned: null,
+  protectedTab: null,
   respectUser: false,
   patched: false,
 });
@@ -334,15 +336,17 @@ if (!ONLY_LIST && !ST.patched) {
   const origRemoveTab = gB.removeTab.bind(gB);
   const origRemoveCurrentTab = gB.removeCurrentTab.bind(gB);
   ST.origRemoveTab = origRemoveTab;
+  // 只拦「当前这一页」的关闭请求。旧实现按 URL 拦，导致同名的登录页与游戏页
+  // 全都关不掉；现在只保护 ST.protectedTab 这一个 tab 对象。
   gB.removeTab = function (tab, opts) {
     try {
-      if (tab && isGame(tab)) { ST.blocked += 1; return; }
+      if (tab && tab === ST.protectedTab) { ST.blocked += 1; return; }
     } catch (e) {}
     return origRemoveTab(tab, opts);
   };
   gB.removeCurrentTab = function (opts) {
     try {
-      if (gB.selectedTab && isGame(gB.selectedTab)) { ST.blocked += 1; return; }
+      if (gB.selectedTab && gB.selectedTab === ST.protectedTab) { ST.blocked += 1; return; }
     } catch (e) {}
     return origRemoveCurrentTab(opts);
   };
@@ -361,8 +365,11 @@ function hardRemove(tab) {
 
 let clouds = cloudTabs();
 let collapsed = 0;
+let deduped = 0;
 let created = false;
 let game = clouds.length ? clouds[clouds.length - 1] : null;
+// 首轮快照：进来时就多于一个 /cloud 页（多半是上次会话恢复 + 本次主页各一页）
+const ambiguous = clouds.length > 1;
 
 if (MODE_ACTION === "close-strays") {
   // 手动清场：留最新的云游戏标签，其余全关
@@ -374,16 +381,20 @@ if (MODE_ACTION === "close-strays") {
   game = clouds.length ? clouds[clouds.length - 1] : null;
 }
 
-if (!ONLY_LIST && COLLAPSE && MODE_ACTION !== "close-strays" && clouds.length >= 2) {
-  // 可选：把重复的 /cloud 页折叠成最新那一页。默认关闭 —— 两个页面同 URL 同标题，
-  // 光凭 URL 分不出哪个才是真正进游戏的，自动关有风险（可能关掉正在玩的那页）。
-  // 要开就设 ENDFIELD_TAB_GUARD_COLLAPSE=1。
-  const keep = clouds[clouds.length - 1];
+// 重复的 /cloud 页只留一页。登录页与游戏页同 URL 同标题，凭 URL 分不出谁是谁，
+// 但「用户当前看着的那一页」就是他要的 ⇒ 留活动页，其余关掉（绕过本文件的关闭拦截）。
+// 这一条同时修「第二次启动 = 固定页 + 新页」与「两页都关不掉」。
+if (!ONLY_LIST && DEDUPE && MODE_ACTION !== "list" && clouds.length > 1) {
+  const sel = gB.selectedTab;
+  let keep = (sel && isGame(sel)) ? sel : clouds[clouds.length - 1];
   for (const t of clouds) {
     if (t === keep) continue;
-    if (hardRemove(t)) collapsed += 1;
+    if (hardRemove(t)) deduped += 1;
   }
+  clouds = cloudTabs();
+  if (clouds.indexOf(keep) < 0) keep = clouds.length ? clouds[clouds.length - 1] : null;
   game = keep;
+  if (ST.protectedTab && clouds.indexOf(ST.protectedTab) < 0) ST.protectedTab = null;
 }
 
 // 用户手动取消过钉住：把「自己 pin 的」这个身份清掉，别再抢回去
@@ -433,18 +444,18 @@ if (!game && !ONLY_LIST) {
   }
 }
 
-// 两个以上云游戏页时「哪个是游戏」无法凭 URL 判定 ⇒ 不自动固定，把决定权留给用户。
 clouds = cloudTabs();
-const ambiguous = clouds.length > 1;
 
-if (game && MODE_ACTION !== "list" && !(ambiguous && MODE_ACTION !== "close-strays")) {
+if (game && MODE_ACTION !== "list") {
   if (!game.pinned && !ST.respectUser) {
     try { gB.pinTab(game); ST.selfPinned = game; } catch (e) {}
   }
+  ST.protectedTab = (game.pinned && !ST.respectUser) ? game : null;
   if (MODE_ACTION === "focus-game" || (created && MODE_ACTION !== "close-strays")) {
     try { gB.selectedTab = game; } catch (e) {}
   }
 }
+if (ST.protectedTab && Array.from(gB.tabs).indexOf(ST.protectedTab) < 0) ST.protectedTab = null;
 
 const tabs = Array.from(gB.tabs).map(function (t, i) {
   return {
@@ -455,6 +466,7 @@ const tabs = Array.from(gB.tabs).map(function (t, i) {
     pinned: !!t.pinned,
     active: t === gB.selectedTab,
     game: isGame(t),
+    protected: t === ST.protectedTab,
     pending: isPending(t)
   };
 });
@@ -465,6 +477,7 @@ return {
   created: created,
   reused: reused,
   collapsed: collapsed,
+  deduped: deduped,
   ambiguous: ambiguous,
   blocked: ST.blocked,
   blockedKeys: ST.blockedKeys || 0,
@@ -493,12 +506,13 @@ BLOCKED_KEYS = [
 ]
 
 
-def build_script(hosts, url, action, collapse=False, block_keys=True):
+def build_script(hosts, url, action, collapse=False, block_keys=True, dedupe=True):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
         "action": json.dumps(action),
         "collapse": "true" if collapse else "false",
+        "dedupe": "true" if dedupe else "false",
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
     }
 
@@ -516,7 +530,7 @@ def main(argv=None):
     ap.add_argument("--host", action="append", default=None, help="云游戏域名，可重复")
     ap.add_argument("--watch", action="store_true", help="持续守护（启动器用）")
     ap.add_argument("--collapse", action="store_true",
-                    help="把重复的云游戏页折叠成最新那一页（默认关，见 ENDFIELD_TAB_GUARD_COLLAPSE）")
+                    help="已废弃：默认就会把重复的云游戏页收敛成一页（ENDFIELD_TAB_DEDUPE=0 关闭）")
     ap.add_argument("--state-file", default=None,
                     help="守护把状态写到这个文件；--list 在守护运行时直接读它")
     ap.add_argument("--interval", type=float, default=3.0, help="守护轮询间隔秒，默认 3")
@@ -548,7 +562,8 @@ def main(argv=None):
 
     collapse = bool(args.collapse) or os.environ.get("ENDFIELD_TAB_GUARD_COLLAPSE", "").strip() == "1"
     block_keys = os.environ.get("ENDFIELD_KEY_BLOCK", "1").strip() != "0"
-    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse, block_keys)
+    dedupe = os.environ.get("ENDFIELD_TAB_DEDUPE", "1").strip() != "0"
+    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe)
 
     def log(msg):
         if not args.quiet:

@@ -10,9 +10,14 @@
 flatpak install -y flathub org.mozilla.firefox
 ```
 
-2. 从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载 `.AppImage`，双击一次并确认允许执行。
+2. 从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载 `.AppImage.tar.gz` 并解压（解压后自带执行权限）：
 
-3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择该 `.AppImage`。
+```sh
+mkdir -p ~/Applications
+tar -xzf endfield-cloud-firefox-*.AppImage.tar.gz -C ~/Applications
+```
+
+3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/` 下解压出来的 `.AppImage`。
 
 ## 常见问题
 
