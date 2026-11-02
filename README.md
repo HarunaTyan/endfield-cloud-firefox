@@ -18,7 +18,7 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 ```
 
 3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
-之后升级只替换这个文件，Steam 条目不用动。
+
 
 ## 常见问题
 
@@ -32,15 +32,15 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
 - **文件名可以修改吗？**
 
-  可以，但 Steam 按路径与文件名识别游戏，改动后会成为另一款游戏，手柄布局需要重新配置。建议固定为 `~/Applications/EndfieldCloud.AppImage` 后再添加。
+  可以，但需同步在 Steam 中修改 属性 - 快捷方式 - 目标 中记录的文件名。
 
-- **如何以全屏运行**
+- **如何以全屏运行？**
 
-  在启动项末尾追加 `--fullscreen`，Firefox 以 kiosk 模式启动，无窗口边框与浏览器界面。退出使用 `Alt+F4`；该模式下 Steam 覆盖层仍显示在最上层。
+  在启动选项输入 `--fullscreen`，使 Firefox 以 kiosk 模式启动，无窗口边框与浏览器界面。退出使用 `Alt+F4`。
 
-- **如何升级**
+- **如何升级？**
 
-  下载新版本，覆盖 `~/Applications/EndfieldCloud.AppImage` 后重新运行。
+  从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载新版本，覆盖 `~/Applications/EndfieldCloud.AppImage` 。
 
 ## 声明
 
