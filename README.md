@@ -14,10 +14,11 @@ flatpak install -y flathub org.mozilla.firefox
 
 ```sh
 mkdir -p ~/Applications
-tar -xzf endfield-cloud-firefox-*.AppImage.tar.gz -C ~/Applications
+tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 ```
 
-3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/` 下解压出来的 `.AppImage`。
+3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
+之后升级只替换这个文件，Steam 条目不用动。
 
 ## 常见问题
 
@@ -28,8 +29,11 @@ tar -xzf endfield-cloud-firefox-*.AppImage.tar.gz -C ~/Applications
 Linux 下载来的文件不带执行权限。改用同一版本的 `.AppImage.tar.gz` 解压（包内已带权限），
 或双击一次 `.AppImage`，在提示里选择继续。
 
+**已经用别的文件名加进 Steam 了，升级后会不会变成另一款游戏？**
+会。改成固定路径 `~/Applications/EndfieldCloud.AppImage` 再指向它一次，之后升级只替换内容。
+
 **升级怎么办？**
-下载新版本，替换同一个文件后重新运行。
+下载新版本，解压覆盖 `~/Applications/EndfieldCloud.AppImage` 后重新运行。
 
 ## 声明
 

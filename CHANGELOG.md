@@ -2,6 +2,12 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.1.2
+
+- 资产文件名去掉版本号：`.AppImage` 固定叫 `EndfieldCloud.AppImage`，版本号只出现在压缩包名与 tag 上。
+  升级只替换文件内容，Steam 条目的目标路径不变，手柄布局不会因为改名而丢失。
+- README 安装步骤与常见问题同步：固定路径 `~/Applications/EndfieldCloud.AppImage`。
+
 ## v1.1.1
 
 - 标签栏恢复隐藏（窗口化模式）：重复的 `/cloud` 页已在 1.1.0 收敛成一页，遮住标签栏不再造成"找不到当前页"。

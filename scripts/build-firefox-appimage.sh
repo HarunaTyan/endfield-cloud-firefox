@@ -4,12 +4,14 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.1.1}"
+VERSION="${ENDFIELD_VERSION:-1.1.2}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"
 APPDIR="$BUILD/EndfieldCloudFirefox.AppDir"
-OUT="$ROOT/dist/endfield-cloud-firefox-$VERSION.AppImage"
+# 文件名不带版本号：Steam 按「路径 + 名字」认游戏，带版本号的名字每升一级就变成
+# 一个新游戏，手柄布局要重配。版本号只出现在压缩包名与 tag 上。
+OUT="$ROOT/dist/EndfieldCloud.AppImage"
 
 mkdir -p "$CACHE" "$ROOT/dist"
 if [ ! -x "$TOOL" ]; then
@@ -41,7 +43,7 @@ chmod 755 "$OUT"
 
 # GitHub Release 的资产下载回来后是 644：可执行位不在 HTTP 里。
 # 用 tar.gz 把 mode 一起带走，用户解压即得 755，不必再 chmod。
-TARBALL="$OUT.tar.gz"
+TARBALL="$ROOT/dist/EndfieldCloud-$VERSION.AppImage.tar.gz"
 rm -f "$TARBALL"
 tar -C "$ROOT/dist" -czf "$TARBALL" "$(basename "$OUT")"
 chmod 644 "$TARBALL"
