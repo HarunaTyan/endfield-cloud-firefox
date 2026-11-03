@@ -511,6 +511,8 @@ function openGameTab(blank) {
   };
   if (blank && nav(blank.linkedBrowser)) return blank;
   const tries = [
+    // addTrustedTab 就是给 chrome 代码用的，不会走那套 CancelContentJSOptions 校验
+    () => (typeof gB.addTrustedTab === "function" ? gB.addTrustedTab(GAME_URL) : null),
     () => gB.addTab(GAME_URL, { triggeringPrincipal: p }),
     () => gB.addTab(GAME_URL),
     () => {

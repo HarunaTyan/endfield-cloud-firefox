@@ -183,6 +183,24 @@ function check(name, cond, detail = "") {
   check("addtab.retried", calls >= 2, "calls=" + calls);
 }
 
+// 2b3) 有 addTrustedTab 时优先用它（它不经过 CancelContentJSOptions 校验）
+{
+  const gB = mkBrowser([], 0);
+  let trusted = 0;
+  gB.addTrustedTab = (url) => {
+    trusted += 1;
+    const t = mkTab(url);
+    gB.tabs.unshift(t);
+    gB.added = url;
+    gB.selectedTab = t;
+    return t;
+  };
+  gB.addTab = () => { throw new TypeError("'uri' member of CancelContentJSOptions is not an object."); };
+  const st = run("once", gB);
+  check("trusted.used", trusted === 1, "trusted=" + trusted);
+  check("trusted.ok", st.ok === true && st.created === true, JSON.stringify(st));
+}
+
 // 2c) 只剩一个普通网页 → 不硬塞云游戏页（用户自己关掉了游戏，别抢）
 {
   const gB = mkBrowser([mkTab(STRAY)]);
