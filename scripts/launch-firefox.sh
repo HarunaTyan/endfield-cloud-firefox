@@ -209,7 +209,13 @@ port_busy() {
 }
 
 start_tab_guard() {
-  [ "$GUARD_ENABLED" = "1" ] || { log "tab-guard: disabled (ENDFIELD_TAB_GUARD=0)"; return 0; }
+  if [ "$GUARD_ENABLED" != "1" ]; then
+    log "tab-guard: disabled (ENDFIELD_TAB_GUARD=0)"
+    if [ "${ENDFIELD_FOCUS:-0}" = "1" ] || [ "${ENDFIELD_BLOCK_JUMPS:-0}" = "1" ]; then
+      log "注意: --focus / --block-jumps 由标签页守护执行，守护关掉后这两个功能不会生效"
+    fi
+    return 0
+  fi
   if [ ! -f "$GUARD_SCRIPT" ]; then
     echo "[launch-firefox] 未找到 $GUARD_SCRIPT，跳过标签页守护（Ctrl+Tab / Ctrl+1 仍可用）。" >&2
     log "WARN: tab-guard script missing: $GUARD_SCRIPT"
