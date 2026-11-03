@@ -14,7 +14,7 @@ node tests/tab-guard-logic.mjs
 - `removeTab` / `removeCurrentTab` 打到云游戏标签上被拦下，打到别的标签上照常关闭；
 - 云游戏标签页消失时会 `addTab` 重建、固定并切回；
 - `--list` 是只读的（不建标签、不打补丁、不动选中）；
-- 两个同名云游戏页时只留最新的那一页（旧的登录页被折叠）；
+- 两个同名云游戏页时：有正在播放的 `<video>` 的那页优先，都没视频才留最新打开的那页；
 - 懒加载（pending）的标签不会被当成「没有云游戏页」而再开一页；
 - 用户手动取消固定后不再抢回去；
 - `--close-strays` 只留云游戏标签；
@@ -22,7 +22,17 @@ node tests/tab-guard-logic.mjs
 
 只依赖 Node（CI 的 ubuntu-latest 自带）。
 
-## 2. Marionette 通信层
+## 2. 守护的状态日志
+
+```sh
+python3 tests/status-log.py
+```
+
+`format_status()` 每次状态变化都会被调用。格式串与参数个数对不上时会抛
+`TypeError: not all arguments converted`，守护随即退出 —— v1.0.14 到 v1.2.0 就是这个故障，
+表现为「标签页能钉住，但之后再没反应」。这个测试把六种状态组合都跑一遍，钉住对应关系。
+
+## 3. Marionette 通信层
 
 ```sh
 python3 tests/marionette-mock.py 2928 -v &

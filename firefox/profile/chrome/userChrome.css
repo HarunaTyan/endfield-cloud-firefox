@@ -41,3 +41,34 @@ scrollbar[orient="vertical"], scrollbar[orient="horizontal"] {
 #ctrlTab-panel .ctrlTab-preview-content {
   opacity: 0.92 !important;
 }
+
+
+/* 右键菜单（手柄操作时容易误触）：挡掉「看源码 / 检查 / 存页面 / 存图 / 图片另开」这类
+ * 改不了也退不出的入口，保留普通右键、复制粘贴文本。 */
+#context-viewsource,
+#context-viewframeinfo,
+#context-viewinfo,
+#context-inspect,
+#context-inspect-a11y,
+#context-savepage,
+#context-saveframe,
+#context-saveimage,
+#context-savevideo,
+#context-saveaudio,
+#context-viewimage,
+#context-viewvideo,
+#context-viewaudio,
+#context-copyimage,
+#context-copyimage-contents,
+#context-copyvideourl,
+#context-copyaudiourl,
+#context-sendimage,
+#context-sendvideo,
+#context-sendaudio,
+#context-sendpagetodevice,
+#context-searchselect,
+#context-searchselect-private,
+#context-askai,
+#context-asksendai {
+  display: none !important;
+}

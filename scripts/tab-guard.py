@@ -93,6 +93,24 @@ def write_json(path, payload):
         return False
 
 
+def format_status(status):
+    """标签状态的一行摘要。
+
+    占位符与参数必须一一对应：这里曾经少一个 %s，导致守护第一轮就抛
+    TypeError（not all arguments converted）并退出，标签锁定静默失效。
+    tests/status-log.py 会把这个对应关系钉住。
+    """
+    return "守护中：标签 %d 个，云游戏标签%s%s，当前第 %d 个，累计拦截误关 %d 次%s%s" % (
+        status.get("count", 0),
+        "在线" if status.get("gameFound") else "缺失→重建",
+        "，折叠重复页 %d 个" % status.get("collapsed") if status.get("collapsed") else "",
+        (status.get("activeIndex") or 0) + 1,
+        status.get("blocked", 0),
+        "，已尊重用户取消固定" if status.get("respectUser") else "",
+        "，注意：有 %d 个同名云游戏页，未自动固定" % status.get("ambiguous") if status.get("ambiguous") else "",
+    )
+
+
 def pid_alive(pid):
     """只看进程在不在；权限不足也当作活着（那是别人的进程，不该抢会话）。"""
     try:
@@ -416,12 +434,35 @@ if (MODE_ACTION === "close-strays") {
 // 重复的 /cloud 页只留一页。登录页与游戏页同 URL 同标题，凭 URL 分不出谁是谁，
 // 只能按时序判断：最新打开的那一页才是这次要玩的（绕过本文件的关闭拦截）。
 // 这一条同时修「第二次启动 = 固定页 + 新页」与「两页都关不掉」。
+// 判断这一页是不是真在出画面：游戏页里会有一个正在解码的 <video>，登录页没有。
+// 读不到 contentDocument（跨进程、页面还没加载）时按「没有视频」处理，不影响兜底。
+function hasLiveVideo(tab) {
+  try {
+    const b = tab && tab.linkedBrowser;
+    const doc = b && (b.contentDocument || (b.contentWindow && b.contentWindow.document));
+    if (!doc || !doc.querySelectorAll) return false;
+    for (const v of doc.querySelectorAll("video")) {
+      if (v.readyState >= 2 || v.currentTime > 0 || v.videoWidth > 0) return true;
+    }
+  } catch (e) {
+    return false;
+  }
+  return false;
+}
+
 if (!ONLY_LIST && DEDUPE && MODE_ACTION !== "list" && clouds.length > 1) {
-  // 留最新打开的那页，不是「活动页」：点「开始游戏」时游戏页可能以后台标签打开
-  // （user.js 里 loadInBackground=true），那时活动页仍停在登录页，留活动页会关掉游戏本体。
-  let keep = clouds[0];
+  // 选择顺序：正在出画面的 > 最新打开的。
+  // 只按时序判断会误伤「游戏页在前、登录页后开」；只看活动页会误伤后台打开的游戏页。
+  let keep = null;
   for (const t of clouds) {
-    if (gB.tabs.indexOf(t) > gB.tabs.indexOf(keep)) keep = t;
+    if (!hasLiveVideo(t)) continue;
+    if (!keep || gB.tabs.indexOf(t) > gB.tabs.indexOf(keep)) keep = t;
+  }
+  if (!keep) {
+    keep = clouds[0];
+    for (const t of clouds) {
+      if (gB.tabs.indexOf(t) > gB.tabs.indexOf(keep)) keep = t;
+    }
   }
   for (const t of clouds) {
     if (t === keep) continue;
@@ -749,21 +790,11 @@ def main(argv=None):
             status.get("activeIndex"),
             status.get("blocked"),
             status.get("respectUser"),
+            status.get("ambiguous"),
         )
         if state != last_state:
             last_state = state
-            log(
-                "守护中：标签 %d 个，云游戏标签%s%s，当前第 %d 个，累计拦截误关 %d 次%s"
-                % (
-                    status.get("count", 0),
-                    "在线" if status.get("gameFound") else "缺失→重建",
-                    "，折叠重复页 %d 个" % status.get("collapsed") if status.get("collapsed") else "",
-                    (status.get("activeIndex") or 0) + 1,
-                    status.get("blocked", 0),
-                    "，已尊重用户取消固定" if status.get("respectUser") else "",
-                    "，注意：有 %d 个同名云游戏页，未自动固定" % status.get("ambiguous") if status.get("ambiguous") else "",
-                )
-            )
+            log(format_status(status))
         time.sleep(args.interval)
 
 if __name__ == "__main__":

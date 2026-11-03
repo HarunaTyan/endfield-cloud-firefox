@@ -47,8 +47,17 @@ function buildScript(action, { dedupe = true, blockKeys = true, collapse = false
     .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
-function mkTab(url, pinned = false, pending = false) {
-  const tab = { label: url, pinned, linkedBrowser: { currentURI: { spec: url, host: new URL(url).host } } };
+function mkTab(url, pinned = false, pending = false, video = false) {
+  // video=true 模拟「这页正在出画面」：游戏页里有一个已解码的 <video>
+  const doc = {
+    querySelectorAll: (sel) =>
+      sel === "video" && video ? [{ readyState: 4, currentTime: 12.5, videoWidth: 1280 }] : [],
+  };
+  const tab = {
+    label: url,
+    pinned,
+    linkedBrowser: { currentURI: { spec: url, host: new URL(url).host }, contentDocument: doc },
+  };
   tab.attrs = new Set(pending ? ["pending"] : []);
   tab.hasAttribute = (name) => tab.attrs.has(name);
   tab.removeAttribute = (name) => tab.attrs.delete(name);
@@ -227,6 +236,27 @@ function check(name, cond, detail = "") {
   check("dupbg.closed-old", !gB.tabs.includes(login));
   check("dupbg.pinned", gameTab.pinned === true);
   check("dupbg.deduped", st.deduped === 1, "deduped=" + st.deduped);
+}
+
+// 7d) 游戏页已经在出画面、登录页最后打开：
+//     只按时序会留登录页，必须让「有视频」的那页赢
+{
+  const gameTab = mkTab(GAME, false, false, true);   // 早开，已有 <video>
+  const login = mkTab(GAME);                          // 刚打开，无视频，最新
+  const gB = mkBrowser([gameTab, login], 1);
+  const st = run("once", gB);
+  check("dupvid.kept-video", gB.tabs.includes(gameTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("dupvid.closed-login", !gB.tabs.includes(login));
+  check("dupvid.deduped", st.deduped === 1, "deduped=" + st.deduped);
+}
+
+// 7e) 两页都没视频：退回「留最新那一页」（v1.2.0 行为不变）
+{
+  const oldTab = mkTab(GAME);
+  const newTab = mkTab(GAME);
+  const gB = mkBrowser([oldTab, newTab], 0);
+  run("once", gB);
+  check("dupnone.kept-newest", gB.tabs.includes(newTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
 }
 
 // 7b) ENDFIELD_TAB_DEDUPE=0：不收敛，两个 /cloud 页都留着，且都能关
