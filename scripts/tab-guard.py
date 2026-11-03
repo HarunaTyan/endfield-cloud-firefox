@@ -599,6 +599,10 @@ function focusPass() {
     if (t === game || t === guard) continue;
     if (isGame(t)) continue;
     if (isPending(t)) continue;
+    // 游戏页自己开出来的窗口（登录、支付这类流程）不动它：
+    // 关掉它们等于把官方流程打断，比留一个标签更糟。
+    const opener = t.openerTabId;
+    if (opener != null && (opener === guard.id || opener === game.id)) continue;
     if (hardRemove(t)) focusClosed += 1;
   }
 }

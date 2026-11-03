@@ -387,6 +387,22 @@ function check(name, cond, detail = "") {
   check("focus.no-new-tab", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
 }
 
+// 9d2) 专注模式：游戏页自己开出来的窗口不关（登录/支付流程），其余照关
+{
+  const gameTab = mkTab(GAME, true);
+  gameTab.id = 11;
+  const popup = mkTab("https://passport.example/login");
+  popup.id = 12;
+  popup.openerTabId = 11;
+  const stray = mkTab(STRAY);
+  stray.id = 13;
+  const gB = mkBrowser([gameTab, popup, stray], 1);
+  const st = run("once", gB, null, { focus: true });
+  check("focus.keeps-opener", gB.tabs.includes(popup), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("focus.closed-other", !gB.tabs.includes(stray));
+  check("focus.opener-count", st.focusClosed === 1, "closed=" + st.focusClosed);
+}
+
 // 9e) 专注模式关闭时：别的标签照旧保留
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(STRAY)], 1);
