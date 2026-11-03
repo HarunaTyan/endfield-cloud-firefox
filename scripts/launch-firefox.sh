@@ -52,6 +52,7 @@ for arg in "$@"; do
     --no-key-block)    export ENDFIELD_KEY_BLOCK=0 ;;
     --keep-dupes)      export ENDFIELD_TAB_DEDUPE=0 ;;
     --focus)           export ENDFIELD_FOCUS=1 ;;
+    --block-jumps)     export ENDFIELD_BLOCK_JUMPS=1 ;;
     --port=*)          export ENDFIELD_MARIONETTE_PORT="${arg#--port=}" ;;
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac

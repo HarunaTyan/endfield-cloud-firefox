@@ -37,7 +37,7 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, { dedupe = true, blockKeys = true, collapse = false, focus = false } = {}) {
+function buildScript(action, { dedupe = true, blockKeys = true, collapse = false, focus = false, blockJumps = false } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
@@ -45,6 +45,8 @@ function buildScript(action, { dedupe = true, blockKeys = true, collapse = false
     .replace("%(collapse)s", collapse ? "true" : "false")
     .replace("%(dedupe)s", dedupe ? "true" : "false")
     .replace("%(focus)s", focus ? "true" : "false")
+    .replace("%(block_jumps)s", blockJumps ? "true" : "false")
+    .replace("%(jump_allow)s", JSON.stringify(["hypergryph.com"]))
     .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
@@ -401,6 +403,16 @@ function check(name, cond, detail = "") {
   check("focus.keeps-opener", gB.tabs.includes(popup), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
   check("focus.closed-other", !gB.tabs.includes(stray));
   check("focus.opener-count", st.focusClosed === 1, "closed=" + st.focusClosed);
+}
+
+// 9d3) 禁止跳转：开关透传到脚本，未开启时不装拦截器
+{
+  const gB = mkBrowser([mkTab(GAME, true)], 0);
+  const st = run("once", gB, null, { blockJumps: true });
+  check("jumps.flag-on", st.blockJumps === true);
+  const off = run("once", mkBrowser([mkTab(GAME, true)], 0));
+  check("jumps.flag-off", off.blockJumps === false);
+  check("jumps.installed", st.ok === true);
 }
 
 // 9e) 专注模式关闭时：别的标签照旧保留

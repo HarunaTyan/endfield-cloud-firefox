@@ -274,6 +274,8 @@ const MODE_ACTION = %(action)s;
 const COLLAPSE = %(collapse)s;
 const DEDUPE = %(dedupe)s;
 const FOCUS = %(focus)s;
+const BLOCK_JUMPS = %(block_jumps)s;
+const JUMP_ALLOW = %(jump_allow)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -587,6 +589,61 @@ if (ST.protectedTab && Array.from(gB.tabs).indexOf(ST.protectedTab) < 0) ST.prot
 // 专注模式（--focus）：这台机器上只允许存在云游戏页。
 //   1. 被钉住的那页跳走了 ⇒ 就地拉回云游戏；
 //   2. 其它非云游戏标签一律关掉（懒加载的跳过，等它加载完下一轮再判）。
+// 禁止跳转（--block-jumps）：在页面里拦“点了会离开云游戏站”的链接。
+// 只拦点击，不取消导航请求 —— 取消导航会把登录、支付这类流程做到一半掐断。
+function jumpShim(allowed) {
+  if (typeof WeakRef === "undefined") return;
+  const ok = (host) => {
+    if (!host) return false;
+    for (const d of allowed) {
+      if (host === d || host.endsWith("." + d)) return true;
+    }
+    return false;
+  };
+  const armed = (doc) => {
+    if (!doc || doc.__endfieldJumpGuard) return;
+    try {
+      Object.defineProperty(doc, "__endfieldJumpGuard", { value: true });
+      doc.addEventListener(
+        "click",
+        (ev) => {
+          const t = ev.target;
+          const a = t && t.closest ? t.closest("a[href]") : null;
+          if (!a) return;
+          let host;
+          try {
+            host = new URL(a.href, doc.location.href).hostname;
+          } catch (e) {
+            return;
+          }
+          if (!host || ok(host)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+        },
+        true
+      );
+    } catch (e) {}
+  };
+  armed(document);
+  try {
+    window.addEventListener("DOMContentLoaded", () => armed(document), true);
+  } catch (e) {}
+}
+
+// 把 shim 作为 frame script 装进这页（每个新文档都会重新执行）
+function installJumpBlocker(tab) {
+  if (!tab || !tab.linkedBrowser) return false;
+  try {
+    const mm = tab.linkedBrowser.messageManager;
+    if (!mm || typeof mm.loadFrameScript !== "function") return false;
+    const src = "(" + jumpShim.toString() + ")(" + JSON.stringify(JUMP_ALLOW) + ");";
+    mm.loadFrameScript("data:application/javascript;charset=utf-8," + encodeURIComponent(src), true);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 let focusReturned = 0;
 let focusClosed = 0;
 function focusPass() {
@@ -607,6 +664,12 @@ function focusPass() {
   }
 }
 focusPass();
+let jumpGuards = 0;
+if (BLOCK_JUMPS && MODE_ACTION !== "list") {
+  for (const t of cloudTabs()) {
+    if (installJumpBlocker(t)) jumpGuards += 1;
+  }
+}
 clouds = cloudTabs();
 game = clouds.length ? clouds[clouds.length - 1] : game;
 
@@ -634,6 +697,8 @@ return {
   rebuilt: ST.rebuilds || 0,
   lastRebuildAt: ST.lastRebuildAt || 0,
   focus: FOCUS,
+  blockJumps: BLOCK_JUMPS,
+  jumpGuards: jumpGuards,
   focusReturned: focusReturned,
   focusClosed: focusClosed,
   collapsed: collapsed,
@@ -649,6 +714,14 @@ return {
 };
 """
 
+
+# 默认放行：官方运营与游戏域名。跨到别的站才拦。
+DEFAULT_JUMP_ALLOW = [
+    "hypergryph.com",
+    "hypergryph.net",
+    "gryphline.com",
+    "gryphline.net",
+]
 
 BLOCKED_KEYS = [
     {"key": "n", "ctrl": True, "shift": False, "alt": False, "meta": False},
@@ -667,7 +740,10 @@ BLOCKED_KEYS = [
 ]
 
 
-def build_script(hosts, url, action, collapse=False, block_keys=True, dedupe=True, focus=False):
+def build_script(
+    hosts, url, action, collapse=False, block_keys=True, dedupe=True, focus=False,
+    block_jumps=False, jump_allow=None,
+):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
@@ -675,6 +751,8 @@ def build_script(hosts, url, action, collapse=False, block_keys=True, dedupe=Tru
         "collapse": "true" if collapse else "false",
         "dedupe": "true" if dedupe else "false",
         "focus": "true" if focus else "false",
+        "block_jumps": "true" if block_jumps else "false",
+        "jump_allow": json.dumps(jump_allow or []),
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
     }
 
@@ -726,8 +804,12 @@ def main(argv=None):
     block_keys = os.environ.get("ENDFIELD_KEY_BLOCK", "1").strip() != "0"
     dedupe = os.environ.get("ENDFIELD_TAB_DEDUPE", "1").strip() != "0"
     focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
+    block_jumps = os.environ.get("ENDFIELD_BLOCK_JUMPS", "0").strip() == "1"
+    allow = [h for h in os.environ.get("ENDFIELD_JUMP_ALLOW", "").split(",") if h.strip()]
+    jump_allow = DEFAULT_JUMP_ALLOW + [h.strip() for h in allow]
     script = build_script(
-        hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe, focus
+        hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe,
+        focus, block_jumps, jump_allow,
     )
 
     def log(msg):
