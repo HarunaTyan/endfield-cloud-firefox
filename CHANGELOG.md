@@ -2,6 +2,12 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.5
+
+- 新增与 `ENDFIELD_*` 环境变量等价的启动参数：`--no-guard`、`--show-chrome`、`--no-key-block`、`--keep-dupes`、`--port=N`。
+  Steam 的启动选项里直接写 `--fullscreen --no-guard` 即可，不必再记 `%command%` 该放前还是放后。
+- `--help` 同步列出这些参数。
+
 ## v1.2.4
 
 - 状态里新增 `rebuilt` 与 `lastRebuildAt`：重建标签页的累计次数，巡检不会把它冲掉（`created`/`reused` 只反映当轮）。

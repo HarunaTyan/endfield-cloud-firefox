@@ -46,6 +46,12 @@ for arg in "$@"; do
     --fullscreen)      WINDOW_MODE="fullscreen" ;;
     --windowed)        WINDOW_MODE="windowed" ;;
     --window-mode=*)   WINDOW_MODE="${arg#--window-mode=}" ;;
+    # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
+    --no-guard)        export ENDFIELD_TAB_GUARD=0 ;;
+    --show-chrome)     export ENDFIELD_SHOW_CHROME=1 ;;
+    --no-key-block)    export ENDFIELD_KEY_BLOCK=0 ;;
+    --keep-dupes)      export ENDFIELD_TAB_DEDUPE=0 ;;
+    --port=*)          export ENDFIELD_MARIONETTE_PORT="${arg#--port=}" ;;
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
 done
