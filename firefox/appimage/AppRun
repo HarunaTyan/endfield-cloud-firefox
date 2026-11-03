@@ -16,7 +16,7 @@ case "${1:-}" in
                                 [--fullscreen|--windowed]
                                 [--window-mode=auto|fullscreen|windowed]
                                 [--no-guard] [--show-chrome] [--no-key-block]
-                                [--keep-dupes] [--port=N]
+                                [--keep-dupes] [--focus] [--port=N]
 
 启动参数（写在 %command% 之后；单独给也行）:
   --fullscreen            强制无边框全屏（kiosk）
@@ -25,6 +25,7 @@ case "${1:-}" in
   --show-chrome           同 ENDFIELD_SHOW_CHROME=1（临时显示标签栏与地址栏）
   --no-key-block          同 ENDFIELD_KEY_BLOCK=0（放行被拦的快捷键）
   --keep-dupes            同 ENDFIELD_TAB_DEDUPE=0
+  --focus                 专注模式：云游戏页跳走就拉回，其它标签一律关掉
   --port=N                同 ENDFIELD_MARIONETTE_PORT=N
 
 环境变量:

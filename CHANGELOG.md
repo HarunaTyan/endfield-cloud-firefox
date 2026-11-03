@@ -2,6 +2,12 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.6
+
+- 新增专注模式 `--focus`（等价 `ENDFIELD_FOCUS=1`）：只允许云游戏页存在。
+  被钉住的页跳去别的网站会就地拉回；其它标签页一律关掉；懒加载的页等它加载完再判，避免误关。
+- 状态里新增 `focus` / `focusReturned` / `focusClosed`，便于确认它真的在工作。
+
 ## v1.2.5
 
 - 新增与 `ENDFIELD_*` 环境变量等价的启动参数：`--no-guard`、`--show-chrome`、`--no-key-block`、`--keep-dupes`、`--port=N`。

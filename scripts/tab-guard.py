@@ -273,6 +273,7 @@ const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
 const COLLAPSE = %(collapse)s;
 const DEDUPE = %(dedupe)s;
+const FOCUS = %(focus)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -495,20 +496,23 @@ function isBlankTab(tab) {
 // 建页/导航的 options 校验在各版本间变过：Firefox 158 上给 addTab 传 triggeringPrincipal
 // 会抛 "TypeError: 'uri' member of CancelContentJSOptions is not an object"，
 // 于是「关掉最后一个标签后自愈」直接失败。这里按能力逐级降级，能走通哪条都行。
+function navigateTo(b, url) {
+  const p = Services.scriptSecurityManager.getSystemPrincipal();
+  if (!b) return false;
+  for (const name of ["fixupAndLoadURIString", "loadURI"]) {
+    try {
+      if (typeof b[name] === "function") {
+        b[name](url, { triggeringPrincipal: p });
+        return true;
+      }
+    } catch (e) {}
+  }
+  return false;
+}
+
 function openGameTab(blank) {
   const p = Services.scriptSecurityManager.getSystemPrincipal();
-  const nav = (b) => {
-    if (!b) return false;
-    for (const name of ["fixupAndLoadURIString", "loadURI"]) {
-      try {
-        if (typeof b[name] === "function") {
-          b[name](GAME_URL, { triggeringPrincipal: p });
-          return true;
-        }
-      } catch (e) {}
-    }
-    return false;
-  };
+  const nav = (b) => navigateTo(b, GAME_URL);
   if (blank && nav(blank.linkedBrowser)) return blank;
   const tries = [
     // addTrustedTab 就是给 chrome 代码用的，不会走那套 CancelContentJSOptions 校验
@@ -580,6 +584,28 @@ if (game && MODE_ACTION !== "list") {
 }
 if (ST.protectedTab && Array.from(gB.tabs).indexOf(ST.protectedTab) < 0) ST.protectedTab = null;
 
+// 专注模式（--focus）：这台机器上只允许存在云游戏页。
+//   1. 被钉住的那页跳走了 ⇒ 就地拉回云游戏；
+//   2. 其它非云游戏标签一律关掉（懒加载的跳过，等它加载完下一轮再判）。
+let focusReturned = 0;
+let focusClosed = 0;
+function focusPass() {
+  if (!FOCUS || MODE_ACTION === "list") return;
+  const guard = ST.protectedTab || game;
+  if (guard && !isGame(guard)) {
+    if (navigateTo(guard.linkedBrowser, GAME_URL)) focusReturned += 1;
+  }
+  for (const t of Array.from(gB.tabs)) {
+    if (t === game || t === guard) continue;
+    if (isGame(t)) continue;
+    if (isPending(t)) continue;
+    if (hardRemove(t)) focusClosed += 1;
+  }
+}
+focusPass();
+clouds = cloudTabs();
+game = clouds.length ? clouds[clouds.length - 1] : game;
+
 const tabs = Array.from(gB.tabs).map(function (t, i) {
   return {
     i: i,
@@ -603,6 +629,9 @@ return {
   reused: reused,
   rebuilt: ST.rebuilds || 0,
   lastRebuildAt: ST.lastRebuildAt || 0,
+  focus: FOCUS,
+  focusReturned: focusReturned,
+  focusClosed: focusClosed,
   collapsed: collapsed,
   deduped: deduped,
   dedupeReason: dedupeReason,
@@ -634,13 +663,14 @@ BLOCKED_KEYS = [
 ]
 
 
-def build_script(hosts, url, action, collapse=False, block_keys=True, dedupe=True):
+def build_script(hosts, url, action, collapse=False, block_keys=True, dedupe=True, focus=False):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
         "action": json.dumps(action),
         "collapse": "true" if collapse else "false",
         "dedupe": "true" if dedupe else "false",
+        "focus": "true" if focus else "false",
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
     }
 
@@ -691,7 +721,10 @@ def main(argv=None):
     collapse = bool(args.collapse) or os.environ.get("ENDFIELD_TAB_GUARD_COLLAPSE", "").strip() == "1"
     block_keys = os.environ.get("ENDFIELD_KEY_BLOCK", "1").strip() != "0"
     dedupe = os.environ.get("ENDFIELD_TAB_DEDUPE", "1").strip() != "0"
-    script = build_script(hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe)
+    focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
+    script = build_script(
+        hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe, focus
+    )
 
     def log(msg):
         if not args.quiet:

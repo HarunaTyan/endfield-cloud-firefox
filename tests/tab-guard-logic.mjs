@@ -37,13 +37,14 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, { dedupe = true, blockKeys = true, collapse = false } = {}) {
+function buildScript(action, { dedupe = true, blockKeys = true, collapse = false, focus = false } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
     .replace("%(action)s", JSON.stringify(action))
     .replace("%(collapse)s", collapse ? "true" : "false")
     .replace("%(dedupe)s", dedupe ? "true" : "false")
+    .replace("%(focus)s", focus ? "true" : "false")
     .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
@@ -359,6 +360,39 @@ function check(name, cond, detail = "") {
   check("reopen.respect-cleared", st.respectUser === false, "respectUser=" + st.respectUser);
   check("reopen.protected", st.tabs.some((t) => t.protected === true), JSON.stringify(st.tabs));
   check("reopen.rebuilt-counter", st.rebuilt === 1 && st.lastRebuildAt > 0, "rebuilt=" + st.rebuilt);
+}
+
+// 9c) 专注模式：非云游戏标签一律关掉，云游戏页保留
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(STRAY), mkTab(STRAY)], 1);
+  const st = run("once", gB, null, { focus: true });
+  check("focus.closed-strays", gB.tabs.length === 1 && gB.tabs[0].label === GAME,
+    "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("focus.counted", st.focusClosed === 2, "closed=" + st.focusClosed);
+  check("focus.flag", st.focus === true);
+}
+
+// 9d) 专注模式：被钉住的页跳走了 ⇒ 就地拉回云游戏，不新开一页
+{
+  const gameTab = mkTab(GAME);
+  gameTab.linkedBrowser.loadURI = (url) => { gameTab.navigatedTo = url; };
+  const gB = mkBrowser([gameTab], 0);
+  const win = mkWin(gB);
+  run("once", gB, win, { focus: true });            // 先钉住
+  gameTab.label = STRAY;                            // 用户在这页里跳去了别处
+  gameTab.linkedBrowser.currentURI = { spec: STRAY, host: "example.com" };
+  const st = run("once", gB, win, { focus: true });
+  check("focus.returned", gameTab.navigatedTo === GAME, String(gameTab.navigatedTo));
+  check("focus.returned-count", st.focusReturned === 1, "returned=" + st.focusReturned);
+  check("focus.no-new-tab", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
+}
+
+// 9e) 专注模式关闭时：别的标签照旧保留
+{
+  const gB = mkBrowser([mkTab(GAME, true), mkTab(STRAY)], 1);
+  const st = run("once", gB);
+  check("nofocus.keeps-stray", gB.tabs.length === 2, "tabs=" + gB.tabs.length);
+  check("nofocus.flag", st.focus === false);
 }
 
 // 10) list 不改任何东西：重复页不折叠、pending 不触发建页、不 pin

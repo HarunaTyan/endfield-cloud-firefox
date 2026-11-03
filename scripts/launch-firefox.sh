@@ -51,6 +51,7 @@ for arg in "$@"; do
     --show-chrome)     export ENDFIELD_SHOW_CHROME=1 ;;
     --no-key-block)    export ENDFIELD_KEY_BLOCK=0 ;;
     --keep-dupes)      export ENDFIELD_TAB_DEDUPE=0 ;;
+    --focus)           export ENDFIELD_FOCUS=1 ;;
     --port=*)          export ENDFIELD_MARIONETTE_PORT="${arg#--port=}" ;;
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
