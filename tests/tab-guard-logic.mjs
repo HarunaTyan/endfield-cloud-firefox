@@ -344,6 +344,22 @@ function check(name, cond, detail = "") {
     "respectUser=" + st.respectUser + " pinned=" + gB.tabs[0].pinned);
 }
 
+// 9b) 取消固定之后又把游戏标签页关掉：必须重建并重新固定（作废 respectUser）
+{
+  const gB = mkBrowser([mkTab(GAME)], 0);
+  const win = mkWin(gB);
+  run("once", gB, win);
+  gB.tabs[0].pinned = false;               // 用户取消固定
+  run("once", gB, win);                    // 守护记下 respectUser
+  gB.tabs.length = 0;                      // 用户把唯一的标签页关掉了
+  const st = run("once", gB, win);
+  check("reopen.created", st.created === true, JSON.stringify(st));
+  check("reopen.one-tab", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
+  check("reopen.pinned", gB.tabs[0] && gB.tabs[0].pinned === true, "pinned=" + (gB.tabs[0] || {}).pinned);
+  check("reopen.respect-cleared", st.respectUser === false, "respectUser=" + st.respectUser);
+  check("reopen.protected", st.tabs.some((t) => t.protected === true), JSON.stringify(st.tabs));
+}
+
 // 10) list 不改任何东西：重复页不折叠、pending 不触发建页、不 pin
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(GAME), mkTab("about:blank", false, true)], 1);

@@ -550,6 +550,12 @@ if (!game && !ONLY_LIST) {
       game = openGameTab(null);
       created = !!game;
     }
+    // 云游戏标签页被关掉了（不是被取消固定，是不存在了）：当作“要回到游戏”，
+    // 连之前的手动取消固定一起作废 —— 否则重建出来也不钉，Ctrl+W 一下就没了。
+    if (attempted && game) {
+      ST.respectUser = false;
+      ST.selfPinned = null;
+    }
     // 只有真的去建页了才报错；只剩一个普通网页时 game 本来就该是 null（用户自己关掉了游戏）
     if (attempted && !game) {
       return { ok: false, err: "add-tab-failed", detail: "所有建页方式都失败（见 openGameTab）" };
