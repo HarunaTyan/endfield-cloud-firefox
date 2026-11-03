@@ -72,3 +72,9 @@ scrollbar[orient="vertical"], scrollbar[orient="horizontal"] {
 #context-asksendai {
   display: none !important;
 }
+
+/* 上面隐藏的那批菜单项会留下前后相邻的分隔线，看起来像一排空白；
+ * 内容区右键菜单直接不要分隔线，平铺更干净。 */
+#contentAreaContextMenu menuseparator {
+  display: none !important;
+}

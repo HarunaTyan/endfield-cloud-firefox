@@ -107,7 +107,7 @@ def format_status(status):
         (status.get("activeIndex") or 0) + 1,
         status.get("blocked", 0),
         "，已尊重用户取消固定" if status.get("respectUser") else "",
-        "，注意：有 %d 个同名云游戏页，未自动固定" % status.get("ambiguous") if status.get("ambiguous") else "",
+        "，注意：存在同名云游戏页，未自动固定" if status.get("ambiguous") else "",
     )
 
 
@@ -492,33 +492,65 @@ function isBlankTab(tab) {
   return spec === "" || spec === "about:blank" || spec === "about:newtab" || spec === "about:home";
 }
 
+// 建页/导航的 options 校验在各版本间变过：Firefox 158 上给 addTab 传 triggeringPrincipal
+// 会抛 "TypeError: 'uri' member of CancelContentJSOptions is not an object"，
+// 于是「关掉最后一个标签后自愈」直接失败。这里按能力逐级降级，能走通哪条都行。
+function openGameTab(blank) {
+  const p = Services.scriptSecurityManager.getSystemPrincipal();
+  const nav = (b) => {
+    if (!b) return false;
+    for (const name of ["fixupAndLoadURIString", "loadURI"]) {
+      try {
+        if (typeof b[name] === "function") {
+          b[name](GAME_URL, { triggeringPrincipal: p });
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
+  };
+  if (blank && nav(blank.linkedBrowser)) return blank;
+  const tries = [
+    () => gB.addTab(GAME_URL, { triggeringPrincipal: p }),
+    () => gB.addTab(GAME_URL),
+    () => {
+      const t = gB.addTab("about:blank");
+      nav(t.linkedBrowser);
+      return t;
+    },
+    () => gB.addTab("about:blank")
+  ];
+  for (const f of tries) {
+    try {
+      const t = f();
+      if (t) return t;
+    } catch (e) {}
+  }
+  return null;
+}
+
 let reused = false;
 if (!game && !ONLY_LIST) {
   // 会话恢复是懒加载：pending 的标签 URL 还是 about:blank，看起来「没有云游戏页」。
   // 这种情况下新建标签就会多出一页，所以先等它加载完。
   const pending = Array.from(gB.tabs).some(isPending);
   if (!pending) {
-    const p = Services.scriptSecurityManager.getSystemPrincipal();
     const all = Array.from(gB.tabs);
     const blank = all.length === 1 && isBlankTab(all[0]) ? all[0] : null;
-    try {
-      if (blank) {
-        // 只剩一个空标签（关掉最后一个标签后会这样）⇒ 就地装回云游戏，不新增一页
-        const b = blank.linkedBrowser;
-        if (b && typeof b.loadURI === "function") {
-          b.loadURI(GAME_URL, { triggeringPrincipal: p });
-          game = blank;
-          reused = true;
-        } else {
-          game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
-          created = true;
-        }
-      } else if (all.length === 0) {
-        game = gB.addTab(GAME_URL, { triggeringPrincipal: p, index: 0 });
-        created = true;
-      }
-    } catch (e) {
-      return { ok: false, err: "add-tab-failed", detail: String(e) };
+    let attempted = false;
+    if (blank) {
+      // 只剩一个空标签（关掉最后一个标签后会这样）⇒ 就地装回云游戏，不新增一页
+      attempted = true;
+      game = openGameTab(blank);
+      reused = !!game && game === blank;
+    } else if (all.length === 0) {
+      attempted = true;
+      game = openGameTab(null);
+      created = !!game;
+    }
+    // 只有真的去建页了才报错；只剩一个普通网页时 game 本来就该是 null（用户自己关掉了游戏）
+    if (attempted && !game) {
+      return { ok: false, err: "add-tab-failed", detail: "所有建页方式都失败（见 openGameTab）" };
     }
   }
 }

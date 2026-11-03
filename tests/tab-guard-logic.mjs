@@ -165,6 +165,24 @@ function check(name, cond, detail = "") {
   check("reuse.pinned", blank.pinned === true);
 }
 
+// 2b2) Firefox 158 现场：addTab 带 options 会抛 CancelContentJSOptions，
+//      关掉最后一个标签后必须还能降级建页，不许直接失败
+{
+  const gB = mkBrowser([], 0);
+  const realAdd = gB.addTab;
+  let calls = 0;
+  gB.addTab = function (url, opts) {
+    calls += 1;
+    if (opts) throw new TypeError("'uri' member of CancelContentJSOptions is not an object.");
+    return realAdd.call(gB, url);
+  };
+  const st = run("once", gB);
+  check("addtab.fallback-ok", st.ok === true, JSON.stringify(st));
+  check("addtab.created", st.created === true);
+  check("addtab.one-tab", gB.tabs.length === 1, "tabs=" + gB.tabs.length);
+  check("addtab.retried", calls >= 2, "calls=" + calls);
+}
+
 // 2c) 只剩一个普通网页 → 不硬塞云游戏页（用户自己关掉了游戏，别抢）
 {
   const gB = mkBrowser([mkTab(STRAY)]);
