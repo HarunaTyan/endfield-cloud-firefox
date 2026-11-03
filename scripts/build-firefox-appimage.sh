@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.2.8}"
+VERSION="${ENDFIELD_VERSION:-1.2.9}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"

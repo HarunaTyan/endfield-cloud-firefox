@@ -46,7 +46,7 @@ function buildScript(action, { dedupe = true, blockKeys = true, collapse = false
     .replace("%(dedupe)s", dedupe ? "true" : "false")
     .replace("%(focus)s", focus ? "true" : "false")
     .replace("%(block_jumps)s", blockJumps ? "true" : "false")
-    .replace("%(jump_allow)s", JSON.stringify(["hypergryph.com"]))
+    .replace("%(nav_allow)s", JSON.stringify([{ host: "endfield.hypergryph.com", prefix: "/cloud" }]))
     .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
@@ -413,6 +413,14 @@ function check(name, cond, detail = "") {
   const off = run("once", mkBrowser([mkTab(GAME, true)], 0));
   check("jumps.flag-off", off.blockJumps === false);
   check("jumps.installed", st.ok === true);
+}
+
+// 9d4) 禁止跳转：只放行游戏地址前缀，同域下的反馈/客服页也要拦
+{
+  const gB = mkBrowser([mkTab(GAME, true)], 0);
+  gB.addTabsProgressListener = () => {};
+  const st = run("once", gB, null, { blockJumps: true });
+  check("jumps.listener", st.ok === true && st.blockJumps === true);
 }
 
 // 9e) 专注模式关闭时：别的标签照旧保留
