@@ -124,6 +124,17 @@ sync_profile() {
 }
 if [ "$FIREFOX_KIND" = "flatpak" ] || [ "$FORCE_PROFILE_SYNC" = "1" ]; then
   sync_profile
+  # 调试/测试用：把标签栏和地址栏放回来，方便手动关标签、看地址。
+  # 只在运行 profile（不是仓库里的 profile）上追加，绝不写回仓库。
+  if [ "${ENDFIELD_SHOW_CHROME:-0}" = "1" ] && [ "$RUNTIME_PROFILE" != "$REPO_PROFILE_DIR" ]; then
+    cat >> "$RUNTIME_PROFILE/chrome/userChrome.css" <<'CSS'
+
+/* ENDFIELD_SHOW_CHROME=1：临时把标签栏与地址栏显示出来 */
+#TabsToolbar { display: -moz-box !important; }
+#nav-bar { display: -moz-box !important; }
+CSS
+    log "debug: chrome (tab strip + urlbar) shown on request"
+  fi
 else
   RUNTIME_PROFILE="$REPO_PROFILE_DIR"
 fi

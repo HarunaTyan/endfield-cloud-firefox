@@ -358,6 +358,7 @@ function check(name, cond, detail = "") {
   check("reopen.pinned", gB.tabs[0] && gB.tabs[0].pinned === true, "pinned=" + (gB.tabs[0] || {}).pinned);
   check("reopen.respect-cleared", st.respectUser === false, "respectUser=" + st.respectUser);
   check("reopen.protected", st.tabs.some((t) => t.protected === true), JSON.stringify(st.tabs));
+  check("reopen.rebuilt-counter", st.rebuilt === 1 && st.lastRebuildAt > 0, "rebuilt=" + st.rebuilt);
 }
 
 // 10) list 不改任何东西：重复页不折叠、pending 不触发建页、不 pin

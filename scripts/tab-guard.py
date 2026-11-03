@@ -555,6 +555,10 @@ if (!game && !ONLY_LIST) {
     if (attempted && game) {
       ST.respectUser = false;
       ST.selfPinned = null;
+      // 累计计数：created/reused 只反映本轮，巡检一跑就被下一次覆盖，
+      // 外部只能靠这个数确认“确实重建过”。
+      ST.rebuilds = (ST.rebuilds || 0) + 1;
+      ST.lastRebuildAt = Math.floor(Date.now() / 1000);
     }
     // 只有真的去建页了才报错；只剩一个普通网页时 game 本来就该是 null（用户自己关掉了游戏）
     if (attempted && !game) {
@@ -597,6 +601,8 @@ return {
   gameFound: !!game,
   created: created,
   reused: reused,
+  rebuilt: ST.rebuilds || 0,
+  lastRebuildAt: ST.lastRebuildAt || 0,
   collapsed: collapsed,
   deduped: deduped,
   dedupeReason: dedupeReason,

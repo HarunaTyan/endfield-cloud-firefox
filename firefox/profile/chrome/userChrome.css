@@ -75,6 +75,18 @@ scrollbar[orient="vertical"], scrollbar[orient="horizontal"] {
 
 /* 上面隐藏的那批菜单项会留下前后相邻的分隔线，看起来像一排空白；
  * 内容区右键菜单直接不要分隔线，平铺更干净。 */
+/* id 对不上的项（例如选中文本时的「查看选中部分源代码」）按标签文字兜底去掉；
+ * 截图保留 —— 那是这台机器上少数还能用的功能。 */
+#contentAreaContextMenu menuitem[label*="源代码"],
+#contentAreaContextMenu menuitem[label*="另存为"],
+#contentAreaContextMenu menuitem[label*="保存图像"],
+#contentAreaContextMenu menuitem[label*="打印"],
+#contentAreaContextMenu #context-print-selection,
+#contentAreaContextMenu #context-viewsource,
+#contentAreaContextMenu #context-savepage {
+  display: none !important;
+}
+
 #contentAreaContextMenu menuseparator {
   display: none !important;
 }
