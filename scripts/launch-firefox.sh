@@ -58,6 +58,10 @@ for arg in "$@"; do
   esac
 done
 case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) die "$EXIT_PROFILE" "无效 --window-mode: $WINDOW_MODE";; esac
+# 桌面模式的 kiosk 没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
+if [ "$WINDOW_MODE" = "fullscreen" ] && [ -z "${IN_GAMESCOPE:-}" ]; then
+  echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，kiosk 全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2
+fi
 # 尺寸必须是正整数：非数字会把 word-split/通配符带进后面的命令
 case "$WIDTH" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 宽: $WIDTH";; esac
 case "$HEIGHT" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 高: $HEIGHT";; esac
