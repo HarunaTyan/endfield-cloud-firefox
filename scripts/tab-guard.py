@@ -416,6 +416,7 @@ function hardRemove(tab) {
 let clouds = cloudTabs();
 let collapsed = 0;
 let deduped = 0;
+let dedupeReason = "";
 let created = false;
 let game = clouds.length ? clouds[clouds.length - 1] : null;
 // 首轮快照：进来时就多于一个 /cloud 页（多半是上次会话恢复 + 本次主页各一页）
@@ -458,6 +459,7 @@ if (!ONLY_LIST && DEDUPE && MODE_ACTION !== "list" && clouds.length > 1) {
     if (!hasLiveVideo(t)) continue;
     if (!keep || gB.tabs.indexOf(t) > gB.tabs.indexOf(keep)) keep = t;
   }
+  dedupeReason = keep ? "video" : "newest";
   if (!keep) {
     keep = clouds[0];
     for (const t of clouds) {
@@ -544,7 +546,9 @@ const tabs = Array.from(gB.tabs).map(function (t, i) {
     active: t === gB.selectedTab,
     game: isGame(t),
     protected: t === ST.protectedTab,
-    pending: isPending(t)
+    pending: isPending(t),
+    // 只有云游戏页才查视频：这一位就是「这页在出画面」的证据
+    video: isGame(t) ? hasLiveVideo(t) : false
   };
 });
 
@@ -555,6 +559,7 @@ return {
   reused: reused,
   collapsed: collapsed,
   deduped: deduped,
+  dedupeReason: dedupeReason,
   ambiguous: ambiguous,
   blocked: ST.blocked,
   blockedKeys: ST.blockedKeys || 0,

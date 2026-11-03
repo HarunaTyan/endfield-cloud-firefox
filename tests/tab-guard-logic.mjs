@@ -245,9 +245,11 @@ function check(name, cond, detail = "") {
   const login = mkTab(GAME);                          // 刚打开，无视频，最新
   const gB = mkBrowser([gameTab, login], 1);
   const st = run("once", gB);
+  check("dupvid.flag-video", st.tabs.some((t) => t.video === true), JSON.stringify(st.tabs.map((t) => t.video)));
   check("dupvid.kept-video", gB.tabs.includes(gameTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
   check("dupvid.closed-login", !gB.tabs.includes(login));
   check("dupvid.deduped", st.deduped === 1, "deduped=" + st.deduped);
+  check("dupvid.reason", st.dedupeReason === "video", "reason=" + st.dedupeReason);
 }
 
 // 7e) 两页都没视频：退回「留最新那一页」（v1.2.0 行为不变）
@@ -255,8 +257,9 @@ function check(name, cond, detail = "") {
   const oldTab = mkTab(GAME);
   const newTab = mkTab(GAME);
   const gB = mkBrowser([oldTab, newTab], 0);
-  run("once", gB);
+  const st = run("once", gB);
   check("dupnone.kept-newest", gB.tabs.includes(newTab), "tabs=" + gB.tabs.map((t) => t.label).join("|"));
+  check("dupnone.reason", st.dedupeReason === "newest", "reason=" + st.dedupeReason);
 }
 
 // 7b) ENDFIELD_TAB_DEDUPE=0：不收敛，两个 /cloud 页都留着，且都能关
