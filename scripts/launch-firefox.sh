@@ -222,7 +222,7 @@ start_tab_guard() {
     return 0
   fi
   # 后台守护：与 Firefox 的连接断开（浏览器退出）后自行结束。
-  python3 "$GUARD_SCRIPT" --watch --port "$MARIONETTE_PORT" --url "$URL" \
+  python3 "$GUARD_SCRIPT" --watch --interval 1 --port "$MARIONETTE_PORT" --url "$URL" \
     --state-file "$RUNTIME_BASE/tab-guard-state.json" >>"$LOG_FILE" 2>&1 &
   GUARD_ACTIVE=1
   log "tab-guard: started (pid $!, port $MARIONETTE_PORT)"

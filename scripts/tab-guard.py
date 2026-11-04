@@ -383,16 +383,17 @@ if (!ONLY_LIST && !ST.keyFilter && BLOCKED_KEYS.length) {
   win.addEventListener("keydown", ST.keyFilter, true);
 }
 
-// ---- 指针锁定：手柄动一下就把光标还回来（幂等）----
-// 点一下画面，云游戏页会请求 pointer lock：光标锁进画布，之后的鼠标位移被当成视角增量。
-// Deck 上退出它的默认办法是 Esc，但这里 Esc 是游戏自己的功能键、屏幕键盘也没有这个键，
-// 锁定期间又点不到游戏自己的悬浮面板，于是卡在键鼠视角里出不来。
-// 判据：只要有任何手柄按键被按下，就释放锁定，把操作权交回手柄。
-// 关掉：ENDFIELD_POINTER_RELEASE=0。
-if (!ONLY_LIST && POINTER_RELEASE) {
+// ---- 指针锁定：手柄一连上就不让页面锁光标（幂等）----
+// 云游戏页点一下就请求 pointer lock：光标被浏览器收走，之后的鼠标位移被当成视角增量。
+// 这台机器上没有 Esc（屏幕键盘也没有这个键），锁定后又点不到游戏自己的悬浮面板，
+// 于是「光标消失 + 一动就转视角」，退不出来。
+// 规则：只要还接着手柄，就不允许页面锁住指针——点了也立刻放回来。
+// 手柄断开时保持原样（键鼠玩法仍然可以用）。
+// 关掉：ENDFIELD_POINTER_RELEASE=0；只要按下才释放：ENDFIELD_POINTER_RELEASE=press。
+if (!ONLY_LIST && POINTER_RELEASE !== "off") {
   if (!ST.pointerRelease) {
     ST.pointerRelease = function () {
-      const out = { locked: false, released: false };
+      const out = { locked: false, released: false, pads: 0, pressed: false };
       try {
         const tab = gB.selectedTab;
         const b = tab && tab.linkedBrowser;
@@ -400,11 +401,9 @@ if (!ONLY_LIST && POINTER_RELEASE) {
         try { w = b && b.contentWindow; } catch (e) {}
         const pw = w && (w.wrappedJSObject || w);
         const doc = pw && pw.document;
-        if (!doc || !doc.pointerLockElement) return out;
-        out.locked = true;
-        // 取手柄列表的入口不止一个：页面自己的 navigator 有权限门控，取不到时再退到
-        // 内容窗口、最后退到浏览器的 navigator。任一处能读到按下状态就算数。
-        let pressed = false;
+        if (!doc) return out;
+        // 手柄列表的入口不止一个：页面自己的 navigator 有权限门控，取不到时再退到
+        // 内容窗口、最后退到浏览器的 navigator。任一处读到设备就算「接着手柄」。
         const navs = [];
         try { if (pw.navigator) navs.push(pw.navigator); } catch (e) {}
         try { if (w.navigator && w.navigator !== pw.navigator) navs.push(w.navigator); } catch (e) {}
@@ -412,20 +411,22 @@ if (!ONLY_LIST && POINTER_RELEASE) {
           if (typeof navigator !== "undefined" && navigator.getGamepads) navs.push(navigator);
         } catch (e) {}
         for (const nav of navs) {
-          if (pressed) break;
+          if (out.pads) break;
           try {
             if (typeof nav.getGamepads !== "function") continue;
-            const pads = nav.getGamepads() || [];
-            for (const pad of pads) {
+            for (const pad of nav.getGamepads() || []) {
               if (!pad) continue;
+              out.pads += 1;
               for (const btn of pad.buttons || []) {
-                if (btn && (btn.pressed || btn.value > 0.5)) { pressed = true; break; }
+                if (btn && (btn.pressed || btn.value > 0.5)) { out.pressed = true; break; }
               }
-              if (pressed) break;
             }
           } catch (e) {}
         }
-        if (pressed && doc.exitPointerLock) {
+        if (!doc.pointerLockElement) return out;
+        out.locked = true;
+        const want = POINTER_RELEASE === "press" ? out.pressed : out.pads > 0;
+        if (want && doc.exitPointerLock) {
           doc.exitPointerLock();
           out.released = true;
           ST.pointerUnlocked = (ST.pointerUnlocked || 0) + 1;
@@ -881,6 +882,8 @@ return {
   blocked: ST.blocked,
   blockedKeys: ST.blockedKeys || 0,
   pointerUnlocked: ST.pointerUnlocked || 0,
+  pointerLocked: !!(ST.pointer && ST.pointer.locked),
+  pointerPads: (ST.pointer && ST.pointer.pads) || 0,
   respectUser: !!ST.respectUser,
   count: tabs.length,
   activeIndex: gB.tabContainer.selectedIndex,
@@ -905,6 +908,16 @@ BLOCKED_KEYS = [
     {"key": "o", "ctrl": True, "shift": False, "alt": False, "meta": False},
     {"key": "f12", "ctrl": False, "shift": False, "alt": False, "meta": False},
 ]
+
+
+def _pointer_release_mode(raw):
+    """ENDFIELD_POINTER_RELEASE: on（默认，接手柄就不许锁光标）/ press（按下才放）/ off。"""
+    v = (raw or "on").strip().lower()
+    if v in ("0", "off", "no", "false", "disable", "disabled"):
+        return "off"
+    if v in ("press", "button", "buttons", "gamepad-press"):
+        return "press"
+    return "on"
 
 
 def nav_rules(url=None):
@@ -935,7 +948,7 @@ def nav_rules(url=None):
 
 def build_script(
     hosts, url, action, block_keys=True, dedupe=True, focus=False,
-    block_jumps=False, nav_allow=None, pointer_release=True,
+    block_jumps=False, nav_allow=None, pointer_release="on",
 ):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
@@ -946,7 +959,7 @@ def build_script(
         "block_jumps": "true" if block_jumps else "false",
         "nav_allow": json.dumps(nav_allow or []),
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
-        "pointer_release": "true" if pointer_release else "false",
+        "pointer_release": json.dumps(pointer_release),
     }
 
 
@@ -996,7 +1009,7 @@ def main(argv=None):
     focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
     block_jumps = os.environ.get("ENDFIELD_BLOCK_JUMPS", "0").strip() == "1"
     nav_allow = nav_rules()
-    pointer_release = os.environ.get("ENDFIELD_POINTER_RELEASE", "1").strip() != "0"
+    pointer_release = _pointer_release_mode(os.environ.get("ENDFIELD_POINTER_RELEASE", "on"))
     script = build_script(
         hosts, args.url, "list" if action == "list" else action, block_keys, dedupe,
         focus, block_jumps, nav_allow, pointer_release,
@@ -1085,6 +1098,7 @@ def main(argv=None):
     # 先落一次状态：CLI 靠文件 mtime 判活在，晚写会有一段“看起来守护不在”的窗口
     write_json(sfile, {"ts": time.time(), "pid": os.getpid(), "starting": True})
     last_state = None
+    last_pu = 0
     failures = 0
     handled_cmd = None
     last_cmd = None
@@ -1155,6 +1169,10 @@ def main(argv=None):
         if state != last_state:
             last_state = state
             log(format_status(status))
+        pu = status.get("pointerUnlocked") or 0
+        if pu != last_pu:
+            last_pu = pu
+            log("指针：页面请求了光标锁定，已放回 %d 次（检测到手柄 %d 个）" % (pu, status.get("pointerPads") or 0))
         time.sleep(args.interval)
 
 if __name__ == "__main__":
