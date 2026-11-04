@@ -4,7 +4,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="${ENDFIELD_VERSION:-1.3.6}"
+VERSION="${ENDFIELD_VERSION:-1.3.7}"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/endfield-appimage"
 TOOL="$CACHE/appimagetool-x86_64.AppImage"
 BUILD="$ROOT/build/firefox-appimage"
@@ -50,6 +50,9 @@ cp -a "$ROOT/resources/icons/512x512.png" "$APPDIR/endfield-cloud-firefox.png"
 chmod 755 "$APPDIR/AppRun" \
           "$APPDIR/usr/share/endfield-firefox/launch-firefox.sh" \
           "$APPDIR/usr/share/endfield-firefox/tab-guard.py"
+
+# 版本号只有一处来源：构建时写进包内，运行期由 launch-firefox.sh 与 AppRun 读同一个文件。
+printf '%s\n' "$VERSION" > "$APPDIR/usr/share/endfield-firefox/version"
 
 # appimagetool 本身也是 AppImage；extract-and-run 免掉 FUSE 依赖。
 rm -f "$OUT"

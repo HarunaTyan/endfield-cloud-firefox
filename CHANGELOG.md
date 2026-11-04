@@ -2,6 +2,13 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.3.7
+
+- 启动时能看出跑的是哪一版：构建把版本号写进包内 `usr/share/endfield-firefox/version`，
+  `--version` 打印 `Endfield Cloud for Steam Deck with Firefox vX.Y.Z`，启动日志多一行 `version=…`。
+- 启动时发一条 500 ms 低优先级通知显示版本，带 `suppress-sound` 提示位、不响铃；`ENDFIELD_VERSION_NOTIFY=0` 可关。
+- 行为不变：仍然不干预指针锁定。
+
 ## v1.3.6
 
 - 页面探测更细：锁定元素、`html` / `body` / 画面元素各自的 `cursor` 样式、视频与焦点状态，每 30 秒写一行日志。

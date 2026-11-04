@@ -33,7 +33,8 @@ EOF
     exit 0
     ;;
   --version)
-    echo "云·终末地 · Firefox 外壳（AppImage 启动器）"
+    _v="$(head -n1 "$HERE/version" 2>/dev/null | tr -d '[:space:]' || true)"
+    echo "Endfield Cloud for Steam Deck with Firefox${_v:+ v$_v}"
     exit 0
     ;;
 esac

@@ -27,6 +27,13 @@ RUNTIME_BASE="$HOME/.var/app/$FLATPAK_ID/endfield-cloud"
 RUNTIME_PROFILE="${ENDFIELD_FIREFOX_RUNTIME_PROFILE:-$RUNTIME_BASE/profile}"
 FORCE_PROFILE_SYNC="${ENDFIELD_FIREFOX_FORCE_PROFILE_SYNC:-0}"
 LOG_FILE="$RUNTIME_BASE/launch-firefox.log"
+# 版本号：AppImage 构建时把 usr/share/endfield-firefox/version 放在本脚本旁边；
+# 仓库直跑时找 repo 根的 version。都没有就留空，不弹提示。
+VERSION=""
+for _vf in "$(dirname "$0")/version" "$(dirname "$0")/../version"; do
+  if [ -f "$_vf" ]; then VERSION="$(head -n1 "$_vf" 2>/dev/null | tr -d '[:space:]')"; break; fi
+done
+VERSION="${ENDFIELD_VERSION:-$VERSION}"
 DEFAULT_URL="https://endfield.hypergryph.com/cloud"
 EXIT_OK=0; EXIT_NO_FIREFOX=2; EXIT_PROFILE=3; EXIT_RUNNING=4
 
@@ -287,10 +294,20 @@ else
   FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS${RUN_URL:+ \"$RUN_URL\"}"
 fi
 echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
+echo "[launch-firefox] version=${VERSION:-unknown}"
 echo "[launch-firefox] profile=$RUNTIME_PROFILE"
 echo "[launch-firefox] exec: $FINAL_CMD"
+log "version=${VERSION:-unknown}"
 log "exec: $FINAL_CMD"
 [ "${DRY_RUN:-0}" = "1" ] && exit "$EXIT_OK"
+
+# ---------- 版本提示（桌面模式可见；gamescope 下通常看不到，失败也不影响启动）----------
+if [ -n "$VERSION" ] && [ "${ENDFIELD_VERSION_NOTIFY:-1}" != "0" ] && command -v notify-send >/dev/null 2>&1; then
+  # 500ms、低优先级、抑制提示音：只是让人确认跑的是哪版，不打断
+  ( notify-send -a "EndfieldCloud" -u low -t 500 -h boolean:suppress-sound:true \
+      "Endfield Cloud for Steam Deck with Firefox" "v$VERSION" >/dev/null 2>&1 & ) || true
+  log "notified version=$VERSION"
+fi
 
 # exec: 让 Firefox 成为 Steam 快捷方式的直接子进程(退出码直接回传给 Steam)
 if [ "$FIREFOX_KIND" = "flatpak" ]; then
