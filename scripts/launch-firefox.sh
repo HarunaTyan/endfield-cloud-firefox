@@ -304,7 +304,7 @@ log "exec: $FINAL_CMD"
 # ---------- 版本提示（桌面模式可见；gamescope 下通常看不到，失败也不影响启动）----------
 if [ -n "$VERSION" ] && [ "${ENDFIELD_VERSION_NOTIFY:-1}" != "0" ] && command -v notify-send >/dev/null 2>&1; then
   # 500ms、低优先级、抑制提示音：只是让人确认跑的是哪版，不打断
-  ( notify-send -a "EndfieldCloud" -u low -t 500 -h boolean:suppress-sound:true \
+  ( notify-send -a "EndfieldCloud" -u low -t 1200 -h boolean:suppress-sound:true \
       "Endfield Cloud for Steam Deck with Firefox" "v$VERSION" >/dev/null 2>&1 & ) || true
   log "notified version=$VERSION"
 fi
