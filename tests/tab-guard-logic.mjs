@@ -423,6 +423,22 @@ function check(name, cond, detail = "") {
   check("jumps.listener", st.ok === true && st.blockJumps === true);
 }
 
+// 9d5) 禁止跳转：刷新/地址栏走浏览器加载接口，也要被包住
+{
+  const tab = mkTab(GAME, true);
+  const b = tab.linkedBrowser;
+  b.loadedTo = [];
+  b.loadURI = function (u) { b.loadedTo.push(u); };
+  const gB = mkBrowser([tab], 0);
+  gB.addTabsProgressListener = () => {};
+  run("once", gB, null, { blockJumps: true });
+  b.loadURI("https://example.com/feedback");   // 站外：应被吞掉
+  const blocked = b.loadedTo.length === 0;
+  b.loadURI(GAME + "#again");                   // 站内：应放行
+  check("jumps.load-blocked", blocked, "loaded=" + JSON.stringify(b.loadedTo));
+  check("jumps.load-allowed", b.loadedTo.length === 1, "loaded=" + JSON.stringify(b.loadedTo));
+}
+
 // 9e) 专注模式关闭时：别的标签照旧保留
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(STRAY)], 1);

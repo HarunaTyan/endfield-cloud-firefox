@@ -595,6 +595,24 @@ if (ST.protectedTab && Array.from(gB.tabs).indexOf(ST.protectedTab) < 0) ST.prot
 // 放行规则按“游戏地址前缀”算，不是按域名：官方反馈、客服、问题查询都在同一域名下，
 // 按域名放行等于什么都没拦。
 let navBlocked = 0;
+let navCancelFailed = 0;
+
+// 不依赖 Ci/Cr：这两个快捷名在 chrome 沙箱里不一定注入，取不到就抛，
+// 异常被 catch 掉的表现就是“规则在跑，但一次都没拦住”。
+const NAV_STATE = (() => {
+  try {
+    if (typeof Ci !== "undefined" && Ci.nsIWebProgressListener) {
+      return Ci.nsIWebProgressListener;
+    }
+  } catch (e) {}
+  return { STATE_START: 0x00000001, STATE_IS_WINDOW: 0x00010000, STATE_IS_DOCUMENT: 0x00080000 };
+})();
+const NAV_ABORTED = (() => {
+  try {
+    if (typeof Cr !== "undefined" && Cr.NS_BINDING_ABORTED) return Cr.NS_BINDING_ABORTED;
+  } catch (e) {}
+  return 0x804b0002;
+})();
 
 function navAllowed(spec) {
   if (!spec) return true;
@@ -615,6 +633,44 @@ function navAllowed(spec) {
   return false;
 }
 
+// 刷新按钮与地址栏不经过页面里的点击，监听器看到时已经提交了；
+// 直接在浏览器对象的加载接口上包一层，是最短的那条路。
+function wrapLoaders(tab) {
+  const b = tab && tab.linkedBrowser;
+  if (!b || b.__endfieldLoadWrapped) return false;
+  try {
+    Object.defineProperty(b, "__endfieldLoadWrapped", { value: true });
+  } catch (e) {
+    return false;
+  }
+  for (const name of [
+    "loadURI",
+    "loadURIWithFlags",
+    "fixupAndLoadURIString",
+    "reload",
+    "reloadWithFlags",
+  ]) {
+    const orig = b[name];
+    if (typeof orig !== "function") continue;
+    try {
+      b[name] = function (...args) {
+        let target = null;
+        if (name === "reload" || name === "reloadWithFlags") {
+          target = b.currentURI ? b.currentURI.spec : null;
+        } else if (args[0] != null) {
+          target = typeof args[0] === "string" ? args[0] : args[0].spec || null;
+        }
+        if (target && !navAllowed(target)) {
+          navBlocked += 1;
+          return undefined;
+        }
+        return orig.apply(this, args);
+      };
+    } catch (e) {}
+  }
+  return true;
+}
+
 // 只拦“游戏标签页自己的”文档级导航；别的标签跳去哪都不影响会话。
 function installNavBlocker() {
   if (typeof gB.addTabsProgressListener !== "function") return false;
@@ -622,22 +678,35 @@ function installNavBlocker() {
   ST.navListener = {
     onStateChange(browser, webProgress, request, flags, status) {
       try {
-        const S = Ci.nsIWebProgressListener;
-        if (!(flags & S.STATE_START)) return;
-        if (!(flags & S.STATE_IS_DOCUMENT)) return;
-        if (!(flags & S.STATE_IS_WINDOW)) return;
+        if (!(flags & NAV_STATE.STATE_START)) return;
+        if (!(flags & NAV_STATE.STATE_IS_DOCUMENT)) return;
+        if (!(flags & NAV_STATE.STATE_IS_WINDOW)) return;
         const spec = request && request.URI ? request.URI.spec : null;
         if (navAllowed(spec)) return;
         const owner = tabOf(browser);
         if (!owner) return;
         if (!(owner === game || owner === ST.protectedTab || isGame(owner))) return;
-        request.cancel(Cr.NS_BINDING_ABORTED);
-        navBlocked += 1;
+        try {
+          request.cancel(NAV_ABORTED);
+          navBlocked += 1;
+        } catch (e) {
+          // 取消不了（通道已经提交）：直接拉回云游戏，别把会话留在别的页面上
+          navCancelFailed += 1;
+          if (navigateTo(browser, GAME_URL)) navBlocked += 1;
+        }
       } catch (e) {}
     },
   };
   gB.addTabsProgressListener(ST.navListener);
   return true;
+}
+
+function installLoadGuards() {
+  let n = 0;
+  for (const t of Array.from(gB.tabs)) {
+    if (wrapLoaders(t)) n += 1;
+  }
+  return n;
 }
 
 function tabOf(browser) {
@@ -669,7 +738,11 @@ function focusPass() {
   }
 }
 focusPass();
-if (BLOCK_JUMPS && MODE_ACTION !== "list") installNavBlocker();
+let loadGuards = 0;
+if (BLOCK_JUMPS && MODE_ACTION !== "list") {
+  installNavBlocker();
+  loadGuards = installLoadGuards();
+}
 clouds = cloudTabs();
 game = clouds.length ? clouds[clouds.length - 1] : game;
 
@@ -699,6 +772,8 @@ return {
   focus: FOCUS,
   blockJumps: BLOCK_JUMPS,
   navBlocked: navBlocked,
+  navCancelFailed: navCancelFailed,
+  loadGuards: loadGuards,
   focusReturned: focusReturned,
   focusClosed: focusClosed,
   collapsed: collapsed,

@@ -2,6 +2,13 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.13
+
+- 修 `--block-jumps` 拦不住工具栏「刷新」和地址栏：它们不走页面点击，而是直接调浏览器的加载接口。现在在 `loadURI` / `loadURIWithFlags` / `fixupAndLoadURIString` / `reload` / `reloadWithFlags` 上包一层，非云游戏地址直接吞掉。
+- 取消导航失败时不再静默：计数 `navCancelFailed`，并立刻把页面拉回云游戏。
+- 常量不再依赖 `Ci` / `Cr`（chrome 沙箱里不一定有），取不到时用数值兜底。
+- 状态新增 `loadGuards`，为 0 说明加载接口没包上。
+
 ## v1.2.12
 
 - 修 `--show-chrome` 不生效：原样式只把 `#TabsToolbar` 设为 `-moz-box`，但 `#titlebar` 仍被隐藏，且 `-moz-box` 在 Firefox 158 已不是合法值。改用 `display: revert`，同时恢复 `#titlebar`。
