@@ -229,13 +229,6 @@ start_tab_guard() {
   return 0
 }
 
-# 游戏模式里没有键盘按 Esc：页面一旦把指针锁走，光标就回不来。
-# 所以这里默认让守护一拿到锁定就释放；桌面模式不动它（鼠标本来就在）。
-if [ -z "${ENDFIELD_POINTER_RELEASE:-}" ] && [ -n "${IN_GAMESCOPE:-}" ]; then
-  ENDFIELD_POINTER_RELEASE="always"
-fi
-if [ -n "${ENDFIELD_POINTER_RELEASE:-}" ]; then export ENDFIELD_POINTER_RELEASE; fi
-
 [ "${DRY_RUN:-0}" = "1" ] || start_tab_guard
 
 # 守护要跑时才写端口：user.js 每轮都由仓库覆盖，所以每次启动追加一行即可
