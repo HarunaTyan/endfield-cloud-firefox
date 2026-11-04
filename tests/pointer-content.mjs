@@ -19,16 +19,22 @@ function build(mode) {
   return template.replace("%(mode)s", JSON.stringify(mode));
 }
 
-function run(mode, { locked = false, pads = 0, pressed = false, cursor = "auto", broken = false } = {}) {
+function run(mode, { locked = false, pads = 0, pressed = false, cursor = "auto", canvasCursor = "auto", broken = false } = {}) {
   const page = { exited: 0 };
   const gamepads = [];
   for (let i = 0; i < pads; i++) {
     gamepads.push({ buttons: [{ pressed, value: pressed ? 1 : 0 }] });
   }
+  const canvas = { nodeName: "CANVAS", tagName: "CANVAS", id: "" };
   page.document = {
-    pointerLockElement: locked ? { id: "canvas" } : null,
+    pointerLockElement: locked ? canvas : null,
     exitPointerLock() { page.exited += 1; },
-    elementFromPoint() { return { nodeName: "CANVAS" }; },
+    documentElement: { nodeName: "HTML" },
+    body: { nodeName: "BODY" },
+    querySelector: (sel) => (sel.includes("canvas") ? canvas : null),
+    hasFocus: () => true,
+    visibilityState: "visible",
+    elementFromPoint() { return canvas; },
   };
   globalThis.document = page.document;
   // Node 24 起 globalThis.navigator 是只读 getter，得用 defineProperty 覆盖
@@ -39,7 +45,7 @@ function run(mode, { locked = false, pads = 0, pressed = false, cursor = "auto",
   });
   globalThis.innerWidth = 1280;
   globalThis.innerHeight = 800;
-  globalThis.getComputedStyle = () => ({ cursor });
+  globalThis.getComputedStyle = (node) => ({ cursor: node === canvas ? canvasCursor : cursor });
   const out = new Function("return " + build(mode))();
   return { out, page };
 }
@@ -53,12 +59,15 @@ function check(name, cond, detail = "") {
 
 // 1) always：锁住就立刻放
 {
-  const { out, page } = run("always", { locked: true, pads: 1, cursor: "none" });
+  const { out, page } = run("always", { locked: true, pads: 1, cursor: "none", canvasCursor: "none" });
   check("always.released", page.exited === 1, "exited=" + page.exited);
   check("always.flag", out.released === true);
   check("always.locked-before", out.locked === true);
   check("always.pads", out.pads === 1, "pads=" + out.pads);
   check("always.cursor", out.cursor === "none", "cursor=" + out.cursor);
+  check("always.cursor-face", out.cursorFace === "none", "face=" + out.cursorFace);
+  check("always.face", out.face === "canvas", "face=" + out.face);
+  check("always.lock-el", out.lockEl === "canvas", "lockEl=" + out.lockEl);
 }
 
 // 2) always 但没锁：什么都不做（不能每轮都调 exitPointerLock）

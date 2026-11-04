@@ -877,11 +877,28 @@ CONTENT_TEMPLATE = r"""(() => {
         if (b && (b.pressed || b.value > 0.5)) { out.pressed = true; break; }
       }
     }
-    // 光标样式也带出来：页面自己写 cursor:none 和「指针被锁」是两个不同的原因
+    // 光标到底是被「指针锁定」藏起来的，还是页面自己写了 cursor:none，
+    // 只能分开看：分别读 html / body / 画面元素的计算样式。
+    const pick = (node) => {
+      try {
+        if (!node) return "";
+        const cs = getComputedStyle(node);
+        return cs ? (cs.cursor || "") : "";
+      } catch (e) { return ""; }
+    };
+    out.cursor = pick(document.documentElement);
+    out.cursorBody = pick(document.body);
     try {
-      const t = document.elementFromPoint(Math.round(innerWidth / 2), Math.round(innerHeight / 2));
-      const cs = t && getComputedStyle(t);
-      out.cursor = cs ? (cs.cursor || "") : "";
+      const face = document.querySelector("video, canvas");
+      out.cursorFace = pick(face);
+      out.face = face ? face.tagName.toLowerCase() : "";
+    } catch (e) {}
+    out.video = !!document.querySelector("video");
+    try { out.focus = document.hasFocus(); } catch (e) {}
+    try { out.vis = document.visibilityState || ""; } catch (e) {}
+    try {
+      const el = document.pointerLockElement;
+      out.lockEl = el ? (el.tagName.toLowerCase() + (el.id ? "#" + el.id : "")) : "";
     } catch (e) {}
     const want = MODE === "always" || (MODE === "press" && out.pressed);
     if (out.locked && want && document.exitPointerLock) {
@@ -1109,7 +1126,8 @@ def main(argv=None):
     last_state = None
     last_pu = 0
     released_total = 0
-    last_locked = None
+    last_sig = None
+    last_probe_log = 0.0
     last_cursor = None
     failures = 0
     handled_cmd = None
@@ -1175,6 +1193,11 @@ def main(argv=None):
         status["pointerPads"] = probe.get("pads") or 0
         status["pointerPressed"] = bool(probe.get("pressed"))
         status["cursor"] = probe.get("cursor") or ""
+        status["cursorBody"] = probe.get("cursorBody") or ""
+        status["cursorFace"] = probe.get("cursorFace") or ""
+        status["lockEl"] = probe.get("lockEl") or ""
+        status["face"] = probe.get("face") or ""
+        status["video"] = bool(probe.get("video"))
         status["pointerUnlocked"] = released_total
         if probe.get("err"):
             status["pointerErr"] = str(probe.get("err"))[:200]
@@ -1201,18 +1224,34 @@ def main(argv=None):
             log(format_status(status))
         pu = status.get("pointerUnlocked") or 0
         locked = status.get("pointerLocked")
-        cursor = status.get("cursor") or ""
-        if pu != last_pu or locked != last_locked:
-            last_pu = pu
-            last_locked = locked
+        sig = (
+            locked,
+            status.get("lockEl"),
+            status.get("cursor"),
+            status.get("cursorBody"),
+            status.get("cursorFace"),
+            status.get("face"),
+            status.get("video"),
+            status.get("pointerPads"),
+        )
+        if sig != last_sig or (time.time() - last_probe_log) >= 30.0:
+            last_sig = sig
+            last_probe_log = time.time()
             log(
-                "指针：锁定=%s 手柄=%d 光标样式=%s 已放回=%d"
-                % ("是" if locked else "否", status.get("pointerPads") or 0, cursor or "未知", pu)
+                "指针：锁定=%s%s 光标 html=%s body=%s 画面=%s(%s) 视频=%s 手柄=%d 已放回=%d"
+                % (
+                    "是" if locked else "否",
+                    ("(" + str(status.get("lockEl")) + ")") if status.get("lockEl") else "",
+                    status.get("cursor") or "空",
+                    status.get("cursorBody") or "空",
+                    status.get("cursorFace") or "空",
+                    status.get("face") or "-",
+                    "有" if status.get("video") else "无",
+                    status.get("pointerPads") or 0,
+                    pu,
+                )
             )
-        if cursor != last_cursor:
-            last_cursor = cursor
-            if cursor == "none":
-                log("注意：页面把光标样式设成了 none（这不是指针锁定，是网页自己隐藏的）")
+        _ = last_cursor
         time.sleep(args.interval)
 
 if __name__ == "__main__":
