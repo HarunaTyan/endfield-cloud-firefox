@@ -25,6 +25,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/tab-guard.py
           node tests/tab-guard-logic.mjs
+          node tests/pointer-content.mjs
           python3 tests/status-log.py
 
       - name: Build AppImage

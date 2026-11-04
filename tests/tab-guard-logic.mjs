@@ -37,7 +37,7 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, { dedupe = true, blockKeys = true, focus = false, blockJumps = false, pointerRelease = "on" } = {}) {
+function buildScript(action, { dedupe = true, blockKeys = true, focus = false, blockJumps = false } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
@@ -46,8 +46,7 @@ function buildScript(action, { dedupe = true, blockKeys = true, focus = false, b
     .replace("%(focus)s", focus ? "true" : "false")
     .replace("%(block_jumps)s", blockJumps ? "true" : "false")
     .replace("%(nav_allow)s", JSON.stringify([{ host: "endfield.hypergryph.com", prefix: "/cloud" }]))
-    .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []))
-    .replace("%(pointer_release)s", JSON.stringify(pointerRelease));
+    .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
 }
 
 function mkTab(url, pinned = false, pending = false, video = false) {
@@ -539,67 +538,6 @@ function check(name, cond, detail = "") {
   check("keys.list-no-filter", globalThis.__noop === undefined && LAST_WIN.__endfieldTabGuard.keyFilter === undefined);
 }
 
-
-// 13) 指针锁定：接着手柄就不许页面锁光标（on）；按下才放（press）；关掉（off）
-function mkPointerTab(locked, pressed, pad = true) {
-  const pageWin = { exited: 0 };
-  pageWin.document = {
-    pointerLockElement: locked ? { id: "canvas" } : null,
-    exitPointerLock() { pageWin.exited += 1; },
-  };
-  pageWin.navigator = {
-    getGamepads: () => (pad ? [{ buttons: [{ pressed, value: pressed ? 1 : 0 }] }] : [null]),
-  };
-  const t = mkTab(GAME, true);
-  t.linkedBrowser.contentWindow = pageWin;
-  return { tab: t, pageWin };
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(true, false);
-  const gB = mkBrowser([tab], 0);
-  const st = run("once", gB);
-  check("pointer.gamapad-connected-releases", pageWin.exited === 1, "exited=" + pageWin.exited);
-  check("pointer.counted", st.pointerUnlocked === 1, "pointerUnlocked=" + st.pointerUnlocked);
-  check("pointer.pads-seen", st.pointerPads === 1, "pads=" + st.pointerPads);
-  check("pointer.locked-report", st.pointerLocked === true, JSON.stringify(st.pointerLocked));
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(true, true, false);
-  const gB = mkBrowser([tab], 0);
-  const st = run("once", gB);
-  check("pointer.no-pad-keeps-lock", pageWin.exited === 0, "exited=" + pageWin.exited);
-  check("pointer.no-pad-count", (st.pointerUnlocked || 0) === 0, JSON.stringify(st.pointerUnlocked));
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(true, false);
-  const gB = mkBrowser([tab], 0);
-  run("once", gB, null, { pointerRelease: "press" });
-  check("pointer.press-mode-idle", pageWin.exited === 0, "exited=" + pageWin.exited);
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(true, true);
-  const gB = mkBrowser([tab], 0);
-  run("once", gB, null, { pointerRelease: "press" });
-  check("pointer.press-mode-pressed", pageWin.exited === 1, "exited=" + pageWin.exited);
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(true, true);
-  const gB = mkBrowser([tab], 0);
-  run("once", gB, null, { pointerRelease: "off" });
-  check("pointer.off-switch", pageWin.exited === 0, "exited=" + pageWin.exited);
-}
-
-{
-  const { tab, pageWin } = mkPointerTab(false, true);
-  const gB = mkBrowser([tab], 0);
-  run("once", gB);
-  check("pointer.noop-when-unlocked", pageWin.exited === 0, "exited=" + pageWin.exited);
-}
 
 console.log("");
 console.log("== " + pass + " passed, " + fail + " failed ==");

@@ -251,6 +251,35 @@ class MarionetteClient:
                 % last
             )
 
+    def set_context(self, value):
+        for name in ("Marionette:SetContext", "WebDriver:SetContext"):
+            try:
+                self.command(name, {"value": value})
+                return True
+            except MarionetteError:
+                continue
+        return False
+
+    def execute_content(self, script):
+        """切到 content 上下文执行页面脚本，跑完切回 chrome（调用方按 chrome 生活）。"""
+        if not self.set_context("content"):
+            raise MarionetteError("无法切到 content 上下文")
+        try:
+            res = self.command(
+                "WebDriver:ExecuteScript",
+                {
+                    "script": script,
+                    "args": [],
+                    "scriptTimeout": 20000,
+                    "newSandbox": True,
+                },
+            )
+        finally:
+            self.set_context("chrome")
+        if isinstance(res, dict) and "value" in res and len(res) == 1:
+            res = res["value"]
+        return res
+
     def execute(self, script):
         """在 chrome 上下文执行脚本，返回脚本的 JS 返回值。"""
         res = self.command(
@@ -276,7 +305,6 @@ const DEDUPE = %(dedupe)s;
 const FOCUS = %(focus)s;
 const BLOCK_JUMPS = %(block_jumps)s;
 const NAV_ALLOW = %(nav_allow)s;
-const POINTER_RELEASE = %(pointer_release)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -381,61 +409,6 @@ if (!ONLY_LIST && !ST.keyFilter && BLOCKED_KEYS.length) {
     } catch (e) {}
   };
   win.addEventListener("keydown", ST.keyFilter, true);
-}
-
-// ---- 指针锁定：手柄一连上就不让页面锁光标（幂等）----
-// 云游戏页点一下就请求 pointer lock：光标被浏览器收走，之后的鼠标位移被当成视角增量。
-// 这台机器上没有 Esc（屏幕键盘也没有这个键），锁定后又点不到游戏自己的悬浮面板，
-// 于是「光标消失 + 一动就转视角」，退不出来。
-// 规则：只要还接着手柄，就不允许页面锁住指针——点了也立刻放回来。
-// 手柄断开时保持原样（键鼠玩法仍然可以用）。
-// 关掉：ENDFIELD_POINTER_RELEASE=0；只要按下才释放：ENDFIELD_POINTER_RELEASE=press。
-if (!ONLY_LIST && POINTER_RELEASE !== "off") {
-  if (!ST.pointerRelease) {
-    ST.pointerRelease = function () {
-      const out = { locked: false, released: false, pads: 0, pressed: false };
-      try {
-        const tab = gB.selectedTab;
-        const b = tab && tab.linkedBrowser;
-        let w = null;
-        try { w = b && b.contentWindow; } catch (e) {}
-        const pw = w && (w.wrappedJSObject || w);
-        const doc = pw && pw.document;
-        if (!doc) return out;
-        // 手柄列表的入口不止一个：页面自己的 navigator 有权限门控，取不到时再退到
-        // 内容窗口、最后退到浏览器的 navigator。任一处读到设备就算「接着手柄」。
-        const navs = [];
-        try { if (pw.navigator) navs.push(pw.navigator); } catch (e) {}
-        try { if (w.navigator && w.navigator !== pw.navigator) navs.push(w.navigator); } catch (e) {}
-        try {
-          if (typeof navigator !== "undefined" && navigator.getGamepads) navs.push(navigator);
-        } catch (e) {}
-        for (const nav of navs) {
-          if (out.pads) break;
-          try {
-            if (typeof nav.getGamepads !== "function") continue;
-            for (const pad of nav.getGamepads() || []) {
-              if (!pad) continue;
-              out.pads += 1;
-              for (const btn of pad.buttons || []) {
-                if (btn && (btn.pressed || btn.value > 0.5)) { out.pressed = true; break; }
-              }
-            }
-          } catch (e) {}
-        }
-        if (!doc.pointerLockElement) return out;
-        out.locked = true;
-        const want = POINTER_RELEASE === "press" ? out.pressed : out.pads > 0;
-        if (want && doc.exitPointerLock) {
-          doc.exitPointerLock();
-          out.released = true;
-          ST.pointerUnlocked = (ST.pointerUnlocked || 0) + 1;
-        }
-      } catch (e) {}
-      return out;
-    };
-  }
-  ST.pointer = ST.pointerRelease();
 }
 
 // ---- 打补丁：云游戏标签关不掉（幂等）----
@@ -881,9 +854,6 @@ return {
   ambiguous: ambiguous,
   blocked: ST.blocked,
   blockedKeys: ST.blockedKeys || 0,
-  pointerUnlocked: ST.pointerUnlocked || 0,
-  pointerLocked: !!(ST.pointer && ST.pointer.locked),
-  pointerPads: (ST.pointer && ST.pointer.pads) || 0,
   respectUser: !!ST.respectUser,
   count: tabs.length,
   activeIndex: gB.tabContainer.selectedIndex,
@@ -891,6 +861,43 @@ return {
 };
 """
 
+
+
+CONTENT_TEMPLATE = r"""(() => {
+  const MODE = %(mode)s;
+  const out = { ok: true, locked: false, pads: 0, pressed: false, cursor: "", released: false };
+  try {
+    out.locked = !!document.pointerLockElement;
+    let pads = [];
+    try { pads = (navigator.getGamepads ? navigator.getGamepads() : []) || []; } catch (e) {}
+    for (const p of pads) {
+      if (!p) continue;
+      out.pads += 1;
+      for (const b of (p.buttons || [])) {
+        if (b && (b.pressed || b.value > 0.5)) { out.pressed = true; break; }
+      }
+    }
+    // 光标样式也带出来：页面自己写 cursor:none 和「指针被锁」是两个不同的原因
+    try {
+      const t = document.elementFromPoint(Math.round(innerWidth / 2), Math.round(innerHeight / 2));
+      const cs = t && getComputedStyle(t);
+      out.cursor = cs ? (cs.cursor || "") : "";
+    } catch (e) {}
+    const want = MODE === "always" || (MODE === "press" && out.pressed);
+    if (out.locked && want && document.exitPointerLock) {
+      document.exitPointerLock();
+      out.released = true;
+    }
+  } catch (e) {
+    out.ok = false;
+    out.err = String((e && e.message) || e);
+  }
+  return out;
+})()"""
+
+
+def build_content_script(mode):
+    return CONTENT_TEMPLATE % {"mode": json.dumps(mode)}
 
 
 BLOCKED_KEYS = [
@@ -911,13 +918,15 @@ BLOCKED_KEYS = [
 
 
 def _pointer_release_mode(raw):
-    """ENDFIELD_POINTER_RELEASE: on（默认，接手柄就不许锁光标）/ press（按下才放）/ off。"""
-    v = (raw or "on").strip().lower()
+    """ENDFIELD_POINTER_RELEASE: always（一锁就放，游戏模式用）/ press（按下手柄才放）/ off（默认）。"""
+    v = (raw or "off").strip().lower()
     if v in ("0", "off", "no", "false", "disable", "disabled"):
         return "off"
     if v in ("press", "button", "buttons", "gamepad-press"):
         return "press"
-    return "on"
+    if v in ("1", "on", "yes", "true", "always", "auto"):
+        return "always"
+    return "off"
 
 
 def nav_rules(url=None):
@@ -948,7 +957,7 @@ def nav_rules(url=None):
 
 def build_script(
     hosts, url, action, block_keys=True, dedupe=True, focus=False,
-    block_jumps=False, nav_allow=None, pointer_release="on",
+    block_jumps=False, nav_allow=None,
 ):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
@@ -959,7 +968,6 @@ def build_script(
         "block_jumps": "true" if block_jumps else "false",
         "nav_allow": json.dumps(nav_allow or []),
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
-        "pointer_release": json.dumps(pointer_release),
     }
 
 
@@ -1009,11 +1017,12 @@ def main(argv=None):
     focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
     block_jumps = os.environ.get("ENDFIELD_BLOCK_JUMPS", "0").strip() == "1"
     nav_allow = nav_rules()
-    pointer_release = _pointer_release_mode(os.environ.get("ENDFIELD_POINTER_RELEASE", "on"))
+    pointer_release = _pointer_release_mode(os.environ.get("ENDFIELD_POINTER_RELEASE", "off"))
     script = build_script(
         hosts, args.url, "list" if action == "list" else action, block_keys, dedupe,
-        focus, block_jumps, nav_allow, pointer_release,
+        focus, block_jumps, nav_allow,
     )
+    content_script = build_content_script(pointer_release)
 
     def log(msg):
         if not args.quiet:
@@ -1099,6 +1108,9 @@ def main(argv=None):
     write_json(sfile, {"ts": time.time(), "pid": os.getpid(), "starting": True})
     last_state = None
     last_pu = 0
+    released_total = 0
+    last_locked = None
+    last_cursor = None
     failures = 0
     handled_cmd = None
     last_cmd = None
@@ -1121,7 +1133,7 @@ def main(argv=None):
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
-                    result = parse_status(client.execute(build_script(hosts, args.url, want, block_keys, pointer_release=pointer_release)))
+                    result = parse_status(client.execute(build_script(hosts, args.url, want, block_keys)))
                     last_cmd = {"id": cmd_id, "cmd": want, "result": result}
                     log(
                         "外部命令 %s 完成：标签 %d 个%s"
@@ -1149,6 +1161,24 @@ def main(argv=None):
             log("浏览器侧返回失败：%s" % json.dumps(status, ensure_ascii=False))
             time.sleep(args.interval)
             continue
+        # 指针锁定只能在页面世界判断：chrome 侧拿不到 contentDocument（Fission 下为 null），
+        # 而且 getGamepads 在 chrome 上下文里同样是空的。所以每轮额外切一次 content 上下文。
+        try:
+            probe = client.execute_content(content_script) or {}
+        except (MarionetteError, OSError) as exc:
+            probe = {"ok": False, "err": str(exc)}
+        if not isinstance(probe, dict):
+            probe = {}
+        if probe.get("released"):
+            released_total += 1
+        status["pointerLocked"] = bool(probe.get("locked"))
+        status["pointerPads"] = probe.get("pads") or 0
+        status["pointerPressed"] = bool(probe.get("pressed"))
+        status["cursor"] = probe.get("cursor") or ""
+        status["pointerUnlocked"] = released_total
+        if probe.get("err"):
+            status["pointerErr"] = str(probe.get("err"))[:200]
+
         payload = dict(status)
         payload["ts"] = time.time()
         payload["pid"] = os.getpid()
@@ -1170,9 +1200,19 @@ def main(argv=None):
             last_state = state
             log(format_status(status))
         pu = status.get("pointerUnlocked") or 0
-        if pu != last_pu:
+        locked = status.get("pointerLocked")
+        cursor = status.get("cursor") or ""
+        if pu != last_pu or locked != last_locked:
             last_pu = pu
-            log("指针：页面请求了光标锁定，已放回 %d 次（检测到手柄 %d 个）" % (pu, status.get("pointerPads") or 0))
+            last_locked = locked
+            log(
+                "指针：锁定=%s 手柄=%d 光标样式=%s 已放回=%d"
+                % ("是" if locked else "否", status.get("pointerPads") or 0, cursor or "未知", pu)
+            )
+        if cursor != last_cursor:
+            last_cursor = cursor
+            if cursor == "none":
+                log("注意：页面把光标样式设成了 none（这不是指针锁定，是网页自己隐藏的）")
         time.sleep(args.interval)
 
 if __name__ == "__main__":
