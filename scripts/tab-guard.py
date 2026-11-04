@@ -417,7 +417,7 @@ function hardRemove(tab) {
 }
 
 let clouds = cloudTabs();
-let closed = 0;
+ST.closed = ST.closed || 0;
 let deduped = 0;
 let dedupeReason = "";
 let created = false;
@@ -429,7 +429,7 @@ if (MODE_ACTION === "close-strays") {
   // 手动清场：留最新的云游戏标签，其余全关
   for (const t of Array.from(gB.tabs)) {
     if (t === game) continue;
-    if (hardRemove(t)) closed += 1;
+    if (hardRemove(t)) ST.closed += 1;
   }
   clouds = cloudTabs();
   game = clouds.length ? clouds[clouds.length - 1] : null;
@@ -593,8 +593,8 @@ if (ST.protectedTab && Array.from(gB.tabs).indexOf(ST.protectedTab) < 0) ST.prot
 // 早先的做法是“跳走再拉回”，但离开那一刻会话已经断了，拉回等于重新登录，没有意义。
 // 放行规则按“游戏地址前缀”算，不是按域名：官方反馈、客服、问题查询都在同一域名下，
 // 按域名放行等于什么都没拦。
-let navBlocked = 0;
-let navCancelFailed = 0;
+ST.navBlocked = ST.navBlocked || 0;
+ST.navCancelFailed = ST.navCancelFailed || 0;
 
 // 不依赖 Ci/Cr：这两个快捷名在 chrome 沙箱里不一定注入，取不到就抛，
 // 异常被 catch 掉的表现就是“规则在跑，但一次都没拦住”。
@@ -660,7 +660,7 @@ function wrapLoaders(tab) {
           target = typeof args[0] === "string" ? args[0] : args[0].spec || null;
         }
         if (target && !navAllowed(target)) {
-          navBlocked += 1;
+          ST.navBlocked += 1;
           return undefined;
         }
         return orig.apply(this, args);
@@ -687,11 +687,11 @@ function installNavBlocker() {
         if (!(owner === game || owner === ST.protectedTab || isGame(owner))) return;
         try {
           request.cancel(NAV_ABORTED);
-          navBlocked += 1;
+          ST.navBlocked += 1;
         } catch (e) {
           // 取消不了（通道已经提交）：直接拉回云游戏，别把会话留在别的页面上
-          navCancelFailed += 1;
-          if (navigateTo(browser, GAME_URL)) navBlocked += 1;
+          ST.navCancelFailed += 1;
+          if (navigateTo(browser, GAME_URL)) ST.navBlocked += 1;
         }
       } catch (e) {}
     },
@@ -712,7 +712,7 @@ function wrapAddTab() {
     if (typeof uri === "string") spec = uri;
     else if (uri && uri.spec) spec = uri.spec;
     if (spec && !navAllowed(spec)) {
-      navBlocked += 1;
+      ST.navBlocked += 1;
       return null;   // 调用方（window.open）会退回 location.assign，那一层同样被拦
     }
     return orig.call(gB, uri, params, index);
@@ -737,8 +737,8 @@ function tabOf(browser) {
   return null;
 }
 
-let focusReturned = 0;
-let focusClosed = 0;
+ST.focusReturned = ST.focusReturned || 0;
+ST.focusClosed = ST.focusClosed || 0;
 // 严格模式：新标签一出现就关掉，不等下一次巡检。
 // 页面外跳走 window.open，TabOpen 事件会先到，这里立刻判一次。
 function installTabClosing() {
@@ -754,7 +754,7 @@ function installTabClosing() {
       // about:blank 说明地址还没设好，交给下一轮巡检；已带地址的直接判
       if (!spec || spec === "about:blank") return;
       if (isGame(t)) return;
-      if (hardRemove(t)) focusClosed += 1;
+      if (hardRemove(t)) ST.focusClosed += 1;
     } catch (e) {}
   };
   cont.addEventListener("TabOpen", ST.tabCloseHandler);
@@ -765,7 +765,7 @@ function focusPass() {
   if (!FOCUS || MODE_ACTION === "list") return;
   const guard = ST.protectedTab || game;
   if (guard && !isGame(guard)) {
-    if (navigateTo(guard.linkedBrowser, GAME_URL)) focusReturned += 1;
+    if (navigateTo(guard.linkedBrowser, GAME_URL)) ST.focusReturned += 1;
   }
   for (const t of Array.from(gB.tabs)) {
     if (t === game || t === guard) continue;
@@ -775,7 +775,7 @@ function focusPass() {
     // 关掉它们等于把官方流程打断，比留一个标签更糟。
     const opener = t.openerTabId;
     if (opener != null && (opener === guard.id || opener === game.id)) continue;
-    if (hardRemove(t)) focusClosed += 1;
+    if (hardRemove(t)) ST.focusClosed += 1;
   }
 }
 focusPass();
@@ -814,12 +814,12 @@ return {
   lastRebuildAt: ST.lastRebuildAt || 0,
   focus: FOCUS,
   blockJumps: BLOCK_JUMPS,
-  navBlocked: navBlocked,
-  navCancelFailed: navCancelFailed,
+  navBlocked: ST.navBlocked,
+  navCancelFailed: ST.navCancelFailed,
   loadGuards: loadGuards,
-  focusReturned: focusReturned,
-  focusClosed: focusClosed,
-  closed: closed,
+  focusReturned: ST.focusReturned,
+  focusClosed: ST.focusClosed,
+  closed: ST.closed,
   deduped: deduped,
   dedupeReason: dedupeReason,
   ambiguous: ambiguous,
