@@ -37,7 +37,7 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, { dedupe = true, blockKeys = true, focus = false, blockJumps = false } = {}) {
+function buildScript(action, { dedupe = true, blockKeys = true, focus = false, blockJumps = false, pointerRelease = true } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
@@ -46,7 +46,8 @@ function buildScript(action, { dedupe = true, blockKeys = true, focus = false, b
     .replace("%(focus)s", focus ? "true" : "false")
     .replace("%(block_jumps)s", blockJumps ? "true" : "false")
     .replace("%(nav_allow)s", JSON.stringify([{ host: "endfield.hypergryph.com", prefix: "/cloud" }]))
-    .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []));
+    .replace("%(blocked_keys)s", JSON.stringify(blockKeys ? KEYS : []))
+    .replace("%(pointer_release)s", pointerRelease ? "true" : "false");
 }
 
 function mkTab(url, pinned = false, pending = false, video = false) {
@@ -536,6 +537,50 @@ function check(name, cond, detail = "") {
   const gB = mkBrowser([mkTab(GAME)], 0);
   const st = run("list", gB);
   check("keys.list-no-filter", globalThis.__noop === undefined && LAST_WIN.__endfieldTabGuard.keyFilter === undefined);
+}
+
+
+// 13) 指针锁定：手柄按键一按就释放，没按键或没锁定都不动
+function mkPointerTab(locked, pressed) {
+  const pageWin = { exited: 0 };
+  pageWin.document = {
+    pointerLockElement: locked ? { id: "canvas" } : null,
+    exitPointerLock() { pageWin.exited += 1; },
+  };
+  pageWin.navigator = { getGamepads: () => [{ buttons: [{ pressed, value: pressed ? 1 : 0 }] }] };
+  const t = mkTab(GAME, true);
+  t.linkedBrowser.contentWindow = pageWin;
+  return { tab: t, pageWin };
+}
+
+{
+  const { tab, pageWin } = mkPointerTab(true, true);
+  const gB = mkBrowser([tab], 0);
+  const st = run("once", gB);
+  check("pointer.released", pageWin.exited === 1, "exited=" + pageWin.exited);
+  check("pointer.counted", st.pointerUnlocked === 1, "pointerUnlocked=" + st.pointerUnlocked);
+}
+
+{
+  const { tab, pageWin } = mkPointerTab(true, false);
+  const gB = mkBrowser([tab], 0);
+  const st = run("once", gB);
+  check("pointer.kept-when-idle", pageWin.exited === 0, "exited=" + pageWin.exited);
+  check("pointer.not-counted", (st.pointerUnlocked || 0) === 0, JSON.stringify(st.pointerUnlocked));
+}
+
+{
+  const { tab, pageWin } = mkPointerTab(false, true);
+  const gB = mkBrowser([tab], 0);
+  run("once", gB);
+  check("pointer.noop-when-unlocked", pageWin.exited === 0, "exited=" + pageWin.exited);
+}
+
+{
+  const { tab, pageWin } = mkPointerTab(true, true);
+  const gB = mkBrowser([tab], 0);
+  run("once", gB, null, { pointerRelease: false });
+  check("pointer.off-switch", pageWin.exited === 0, "exited=" + pageWin.exited);
 }
 
 console.log("");
