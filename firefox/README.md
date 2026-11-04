@@ -35,9 +35,9 @@ DRY_RUN=1 sh scripts/launch-firefox.sh
 ENDFIELD_FIREFOX_BACKEND=x11 sh scripts/launch-firefox.sh
 ```
 
-参数：`--url=URL`、`--window-size=WxH`、`--fullscreen`。窗口/全屏默认自动判断。
+参数：`--url=URL`（覆盖起始页）、`--strict`（只留游戏）。启动一律全屏 kiosk。
 
-默认（不传 `--fullscreen`）：检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
+启动即 kiosk；检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
 → XWayland + `--kiosk`；否则 → Wayland + 1280×800 窗口。
 
 ## 加进 Steam

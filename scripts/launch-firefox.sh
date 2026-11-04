@@ -5,7 +5,7 @@
 #       也可在桌面模式直接运行。
 #
 # 用法:
-#   launch-firefox.sh [--url=URL] [--window-size=WxH] [--fullscreen]
+#   launch-firefox.sh [--url=URL] [--strict]
 #   环境变量:
 #     DRY_RUN=1                 只打印最终命令，不执行
 #     ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制指定渲染后端
@@ -37,31 +37,24 @@ log() { [ "${ENDFIELD_LOG:-}" = "1" ] || [ -n "${IN_GAMESCOPE:-}" ] || return 0;
 die() { code=$1; shift; echo "[launch-firefox] $*" >&2; log "FATAL($code): $*"; exit "$code"; }
 
 # ---------- 参数解析 ----------
-URL="$DEFAULT_URL"; URL_EXPLICIT=0; WIDTH=1280; HEIGHT=800; WINDOW_MODE="auto"
+URL="$DEFAULT_URL"; URL_EXPLICIT=0
 for arg in "$@"; do
   case "$arg" in
     --url=*)           URL="${arg#--url=}"; URL_EXPLICIT=1 ;;
-    --window-size=*)   WxH="${arg#--window-size=}"; WIDTH="${WxH%%x*}"; HEIGHT="${WxH##*x}" ;;
-    --fullscreen)      WINDOW_MODE="fullscreen" ;;
     # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
     # 对外名字：一个词，讲结果不讲机制
     --strict)          export ENDFIELD_FOCUS=1; export ENDFIELD_BLOCK_JUMPS=1 ;;
     --unlock)          export ENDFIELD_TAB_GUARD=0 ;;
-    --tabs)            export ENDFIELD_SHOW_CHROME=1 ;;
     --keys)            export ENDFIELD_KEY_BLOCK=0 ;;
     --dupes)           export ENDFIELD_TAB_DEDUPE=0 ;;
     --port=*)          export ENDFIELD_MARIONETTE_PORT="${arg#--port=}" ;;
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
 done
-case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) WINDOW_MODE="auto" ;; esac
-# 桌面模式的 kiosk 没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
-if [ "$WINDOW_MODE" = "fullscreen" ] && [ -z "${IN_GAMESCOPE:-}" ]; then
-  echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，kiosk 全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2
+# 桌面模式没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
+if [ -z "${IN_GAMESCOPE:-}" ]; then
+  echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2
 fi
-# 尺寸必须是正整数：非数字会把 word-split/通配符带进后面的命令
-case "$WIDTH" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 宽: $WIDTH";; esac
-case "$HEIGHT" in ''|*[!0-9]*) die "$EXIT_PROFILE" "无效 --window-size 高: $HEIGHT";; esac
 # URL 以 -- 开头会被 Firefox 当成启动参数（例如 --kiosk），只接受 http(s)
 case "$URL" in --*) die "$EXIT_PROFILE" "--url 不能以 -- 开头: $URL";; esac
 
@@ -88,10 +81,7 @@ fi
 if [ -n "${GAMESCOPE_WAYLAND_DISPLAY:-}" ]; then IN_GAMESCOPE=1; fi
 case "$WAYLAND_DISPLAY" in gamescope-*) IN_GAMESCOPE=1;; esac
 
-# auto: gamescope=全屏 kiosk；桌面 KWin=窗口化 1280x800（方便调试，不锁屏）
-if [ "$WINDOW_MODE" = "auto" ]; then
-  if [ -n "${IN_GAMESCOPE:-}" ]; then WINDOW_MODE="fullscreen"; else WINDOW_MODE="windowed"; fi
-fi
+# 一律 kiosk 全屏：这个外壳没有“窗口里看看”的用途
 
 # ---------- Firefox 探测: native 或 flatpak ----------
 FIREFOX_KIND=""; FIREFOX_BIN=""
@@ -133,20 +123,6 @@ sync_profile() {
 }
 if [ "$FIREFOX_KIND" = "flatpak" ] || [ "$FORCE_PROFILE_SYNC" = "1" ]; then
   sync_profile
-  # 调试/测试用：把标签栏和地址栏放回来，方便手动关标签、看地址。
-  # 只在运行 profile（不是仓库里的 profile）上追加，绝不写回仓库。
-  if [ "${ENDFIELD_SHOW_CHROME:-0}" = "1" ] && [ "$RUNTIME_PROFILE" != "$REPO_PROFILE_DIR" ]; then
-    cat >> "$RUNTIME_PROFILE/chrome/userChrome.css" <<'CSS'
-
-/* ENDFIELD_SHOW_CHROME=1：临时把标签栏与地址栏显示出来。
- * 用 revert 回到浏览器默认样式：userChrome.css 里 #titlebar 也一起被隐藏了，
- * 只取消 #TabsToolbar 的 display 是没用的；-moz-box 在 158 上已经不是合法值。 */
-#titlebar,
-#TabsToolbar,
-#nav-bar { display: revert !important; visibility: visible !important; }
-CSS
-    log "debug: chrome (tab strip + urlbar) shown on request"
-  fi
 else
   RUNTIME_PROFILE="$REPO_PROFILE_DIR"
 fi
@@ -279,12 +255,7 @@ case "$FIREFOX_KIND" in
     ;;
 esac
 
-if [ "$WINDOW_MODE" = "fullscreen" ]; then
-  MODE_ARGS="--kiosk"
-else
-  # Firefox 传统 CLI 用的开关是 -width/-height(单横线);--width 在 158 被接受但会告警
-  MODE_ARGS="-width $WIDTH -height $HEIGHT"
-fi
+MODE_ARGS="--kiosk"
 
 RUN_URL="$URL"
 [ -n "$RUN_URL" ] && [ "${RUN_URL#http}" = "$RUN_URL" ] && [ "${RUN_URL#--}" = "$RUN_URL" ] && RUN_URL="https://$RUN_URL"
@@ -300,7 +271,7 @@ if [ "$FIREFOX_KIND" = "flatpak" ]; then
 else
   FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS${RUN_URL:+ \"$RUN_URL\"}"
 fi
-echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
+echo "[launch-firefox] backend=$BACKEND mode=kiosk kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
 echo "[launch-firefox] profile=$RUNTIME_PROFILE"
 echo "[launch-firefox] exec: $FINAL_CMD"
 log "exec: $FINAL_CMD"
