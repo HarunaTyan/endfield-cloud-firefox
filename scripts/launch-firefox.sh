@@ -5,8 +5,7 @@
 #       也可在桌面模式直接运行。
 #
 # 用法:
-#   launch-firefox.sh [--url=URL] [--window-size=WxH] [--fullscreen] [--windowed]
-#                     [--window-mode=auto|fullscreen|windowed]
+#   launch-firefox.sh [--url=URL] [--window-size=WxH] [--fullscreen]
 #   环境变量:
 #     DRY_RUN=1                 只打印最终命令，不执行
 #     ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制指定渲染后端
@@ -44,8 +43,6 @@ for arg in "$@"; do
     --url=*)           URL="${arg#--url=}"; URL_EXPLICIT=1 ;;
     --window-size=*)   WxH="${arg#--window-size=}"; WIDTH="${WxH%%x*}"; HEIGHT="${WxH##*x}" ;;
     --fullscreen)      WINDOW_MODE="fullscreen" ;;
-    --windowed)        WINDOW_MODE="windowed" ;;
-    --window-mode=*)   WINDOW_MODE="${arg#--window-mode=}" ;;
     # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
     # 对外名字：一个词，讲结果不讲机制
     --strict)          export ENDFIELD_FOCUS=1; export ENDFIELD_BLOCK_JUMPS=1 ;;
@@ -57,7 +54,7 @@ for arg in "$@"; do
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
 done
-case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) die "$EXIT_PROFILE" "无效 --window-mode: $WINDOW_MODE";; esac
+case "$WINDOW_MODE" in auto|fullscreen|windowed) ;; *) WINDOW_MODE="auto" ;; esac
 # 桌面模式的 kiosk 没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
 if [ "$WINDOW_MODE" = "fullscreen" ] && [ -z "${IN_GAMESCOPE:-}" ]; then
   echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，kiosk 全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2

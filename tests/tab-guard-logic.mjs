@@ -37,12 +37,11 @@ const KEYS = [
   { key: "f12", ctrl: false, shift: false, alt: false, meta: false },
 ];
 
-function buildScript(action, { dedupe = true, blockKeys = true, collapse = false, focus = false, blockJumps = false } = {}) {
+function buildScript(action, { dedupe = true, blockKeys = true, focus = false, blockJumps = false } = {}) {
   return template
     .replace("%(hosts)s", JSON.stringify(HOSTS))
     .replace("%(url)s", JSON.stringify(GAME))
     .replace("%(action)s", JSON.stringify(action))
-    .replace("%(collapse)s", collapse ? "true" : "false")
     .replace("%(dedupe)s", dedupe ? "true" : "false")
     .replace("%(focus)s", focus ? "true" : "false")
     .replace("%(block_jumps)s", blockJumps ? "true" : "false")
@@ -466,7 +465,7 @@ function check(name, cond, detail = "") {
   const st = run("list", gB);
   check("list.no-collapse", gB.tabs.length === 3, "tabs=" + gB.tabs.length);
   check("list.still-unpinned", gB.tabs[1].pinned === false);
-  check("list.collapsed-zero", st.collapsed === 0);
+  check("list.closed-zero", st.closed === 0);
 }
 
 // 11) 键盘拦截：命中清单吞掉，其余放行

@@ -1,5 +1,5 @@
 /* 云·终末地 · Firefox 窗口化模式 UI 精简
- * 仅在窗口化(--windowed)模式有意义；kiosk 模式下 Firefox 自带无边框全屏，
+ * 仅在窗口模式有意义；kiosk 模式下 Firefox 自带无边框全屏，
  * 不读取/不依赖本文件。需要 user.js 里
  * toolkit.legacyUserProfileCustomizations.stylesheets=true 才生效。
  */

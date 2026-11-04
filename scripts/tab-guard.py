@@ -104,7 +104,7 @@ def format_status(status):
     return "守护中：标签 %d 个，云游戏标签%s%s，当前第 %d 个，累计拦截误关 %d 次%s%s" % (
         status.get("count", 0),
         "在线" if status.get("gameFound") else "缺失→重建",
-        "，折叠重复页 %d 个" % status.get("collapsed") if status.get("collapsed") else "",
+        "，关闭其它标签 %d 个" % status.get("closed") if status.get("closed") else "",
         (status.get("activeIndex") or 0) + 1,
         status.get("blocked", 0),
         "，已尊重用户取消固定" if status.get("respectUser") else "",
@@ -272,7 +272,6 @@ JS_TEMPLATE = r"""const HOSTS = %(hosts)s;
 const BLOCKED_KEYS = %(blocked_keys)s;
 const GAME_URL = %(url)s;
 const MODE_ACTION = %(action)s;
-const COLLAPSE = %(collapse)s;
 const DEDUPE = %(dedupe)s;
 const FOCUS = %(focus)s;
 const BLOCK_JUMPS = %(block_jumps)s;
@@ -345,7 +344,7 @@ function cloudTabs() {
 //   selfPinned   我们自己 pin 的那一页（用户取消钉住后就不再抢回）
 //   respectUser  用户手动取消过钉住 ⇒ 本次会话不再自动 pin
 //   patched      补丁是否已打
-//   collapsed    折叠掉的重复云游戏标签数
+//   closed       被关掉的其它标签数（--close-strays 用）
 const ST = (win.__endfieldTabGuard = win.__endfieldTabGuard || {
   blocked: 0,
   since: Date.now(),
@@ -418,7 +417,7 @@ function hardRemove(tab) {
 }
 
 let clouds = cloudTabs();
-let collapsed = 0;
+let closed = 0;
 let deduped = 0;
 let dedupeReason = "";
 let created = false;
@@ -430,7 +429,7 @@ if (MODE_ACTION === "close-strays") {
   // 手动清场：留最新的云游戏标签，其余全关
   for (const t of Array.from(gB.tabs)) {
     if (t === game) continue;
-    if (hardRemove(t)) collapsed += 1;
+    if (hardRemove(t)) closed += 1;
   }
   clouds = cloudTabs();
   game = clouds.length ? clouds[clouds.length - 1] : null;
@@ -820,7 +819,7 @@ return {
   loadGuards: loadGuards,
   focusReturned: focusReturned,
   focusClosed: focusClosed,
-  collapsed: collapsed,
+  closed: closed,
   deduped: deduped,
   dedupeReason: dedupeReason,
   ambiguous: ambiguous,
@@ -879,14 +878,13 @@ def nav_rules(url=None):
 
 
 def build_script(
-    hosts, url, action, collapse=False, block_keys=True, dedupe=True, focus=False,
+    hosts, url, action, block_keys=True, dedupe=True, focus=False,
     block_jumps=False, nav_allow=None,
 ):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
         "url": json.dumps(url),
         "action": json.dumps(action),
-        "collapse": "true" if collapse else "false",
         "dedupe": "true" if dedupe else "false",
         "focus": "true" if focus else "false",
         "block_jumps": "true" if block_jumps else "false",
@@ -907,8 +905,6 @@ def main(argv=None):
     ap.add_argument("--url", default=os.environ.get("ENDFIELD_GAME_URL", DEFAULT_URL))
     ap.add_argument("--host", action="append", default=None, help="云游戏域名，可重复")
     ap.add_argument("--watch", action="store_true", help="持续守护（启动器用）")
-    ap.add_argument("--collapse", action="store_true",
-                    help="已废弃：默认就会把重复的云游戏页收敛成一页（ENDFIELD_TAB_DEDUPE=0 关闭）")
     ap.add_argument("--state-file", default=None,
                     help="守护把状态写到这个文件；--list 在守护运行时直接读它")
     ap.add_argument("--interval", type=float, default=3.0, help="守护轮询间隔秒，默认 3")
@@ -938,14 +934,13 @@ def main(argv=None):
     else:
         action = "once"
 
-    collapse = bool(args.collapse) or os.environ.get("ENDFIELD_TAB_GUARD_COLLAPSE", "").strip() == "1"
     block_keys = os.environ.get("ENDFIELD_KEY_BLOCK", "1").strip() != "0"
     dedupe = os.environ.get("ENDFIELD_TAB_DEDUPE", "1").strip() != "0"
     focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
     block_jumps = os.environ.get("ENDFIELD_BLOCK_JUMPS", "0").strip() == "1"
     nav_allow = nav_rules()
     script = build_script(
-        hosts, args.url, "list" if action == "list" else action, collapse, block_keys, dedupe,
+        hosts, args.url, "list" if action == "list" else action, block_keys, dedupe,
         focus, block_jumps, nav_allow,
     )
 
@@ -1054,7 +1049,7 @@ def main(argv=None):
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
-                    result = parse_status(client.execute(build_script(hosts, args.url, want, collapse, block_keys)))
+                    result = parse_status(client.execute(build_script(hosts, args.url, want, block_keys)))
                     last_cmd = {"id": cmd_id, "cmd": want, "result": result}
                     log(
                         "外部命令 %s 完成：标签 %d 个%s"
@@ -1093,7 +1088,7 @@ def main(argv=None):
             status.get("count"),
             status.get("gameFound"),
             status.get("created"),
-            status.get("collapsed"),
+            status.get("closed"),
             status.get("activeIndex"),
             status.get("blocked"),
             status.get("respectUser"),

@@ -30,11 +30,11 @@ def check(name, cond, detail=""):
 cases = [
     ("最小集合", {"count": 1, "gameFound": True, "activeIndex": 0, "blocked": 0}),
     ("空字典", {}),
-    ("折叠页", {"count": 1, "gameFound": True, "collapsed": 2, "activeIndex": 0, "blocked": 3}),
+    ("关标签", {"count": 1, "gameFound": True, "closed": 2, "activeIndex": 0, "blocked": 3}),
     ("同名页", {"count": 2, "gameFound": True, "ambiguous": 2, "activeIndex": 1, "blocked": 0}),
     ("用户取消固定", {"count": 1, "gameFound": True, "respectUser": True, "activeIndex": 0, "blocked": 1}),
     ("全开", {
-        "count": 3, "gameFound": False, "collapsed": 1, "ambiguous": 2,
+        "count": 3, "gameFound": False, "closed": 1, "ambiguous": 2,
         "respectUser": True, "activeIndex": 2, "blocked": 9,
     }),
 ]
@@ -52,8 +52,8 @@ line = mod.format_status({"count": 2, "gameFound": True, "ambiguous": 2, "active
 check("text.ambiguous", "同名云游戏页" in line, line)
 line = mod.format_status({"count": 1, "gameFound": False, "activeIndex": 0, "blocked": 0})
 check("text.rebuild", "缺失→重建" in line, line)
-line = mod.format_status({"count": 1, "gameFound": True, "collapsed": 2, "activeIndex": 0, "blocked": 0})
-check("text.collapsed", "折叠重复页 2 个" in line, line)
+line = mod.format_status({"count": 1, "gameFound": True, "closed": 2, "activeIndex": 0, "blocked": 0})
+check("text.closed", "关闭其它标签 2 个" in line, line)
 
 print("== %d passed, %d failed ==" % (len(cases) + 3 - failed, failed))
 sys.exit(1 if failed else 0)

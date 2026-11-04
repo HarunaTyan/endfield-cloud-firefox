@@ -26,18 +26,18 @@ flatpak install flathub org.mozilla.firefox
 flatpak override --user --device=all org.mozilla.firefox
 
 # 桌面窗口化（默认 auto：桌面窗口化，检测到 gamescope 时全屏 kiosk）
-sh scripts/launch-firefox.sh --windowed
+sh scripts/launch-firefox.sh
 
 # 只打印命令，不执行
-DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
+DRY_RUN=1 sh scripts/launch-firefox.sh
 
 # 强制后端
 ENDFIELD_FIREFOX_BACKEND=x11 sh scripts/launch-firefox.sh
 ```
 
-参数：`--url=URL`、`--window-size=WxH`、`--fullscreen`、`--windowed`、`--window-mode=auto|fullscreen|windowed`。
+参数：`--url=URL`、`--window-size=WxH`、`--fullscreen`。窗口/全屏默认自动判断。
 
-`--window-mode=auto`：检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
+默认（不传 `--fullscreen`）：检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
 → XWayland + `--kiosk`；否则 → Wayland + 1280×800 窗口。
 
 ## 加进 Steam
@@ -91,7 +91,7 @@ sh -n scripts/build-firefox-appimage.sh
 sh -n firefox/appimage/AppRun
 python3 -m py_compile scripts/tab-guard.py
 node tests/tab-guard-logic.mjs          # 守护的浏览器侧逻辑（不需要 Firefox）
-DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
+DRY_RUN=1 sh scripts/launch-firefox.sh
 sh scripts/build-firefox-appimage.sh
 ```
 

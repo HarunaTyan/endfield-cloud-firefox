@@ -52,7 +52,7 @@ python3 scripts/tab-guard.py --port 2928 --once
 ```sh
 sh -n scripts/launch-firefox.sh
 sh -n firefox/appimage/AppRun
-DRY_RUN=1 sh scripts/launch-firefox.sh --windowed
+DRY_RUN=1 sh scripts/launch-firefox.sh
 ```
 
 `DRY_RUN=1` 只打印最终命令、不启动、也不拉起守护。
