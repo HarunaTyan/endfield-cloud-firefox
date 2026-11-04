@@ -12,14 +12,16 @@ case "${1:-}" in
 云·终末地 · Firefox 外壳（AppImage）
 
 用法:
-  EndfieldCloudFirefox.AppImage [--strict]
+  EndfieldCloudFirefox.AppImage [--fullscreen] [--strict]
 
-  （不带参数就是全屏 kiosk。桌面模式没有 Steam 叠加层，退出用 Alt+F4。）
+  --fullscreen   强制全屏。游戏模式本来就是全屏，这个参数只对桌面模式有用；
+                 桌面模式没有 Steam 叠加层，退出用 Alt+F4。
   --strict       只留游戏：站外链接、刷新、地址栏都拦下；客服、反馈这类
                  新标签一出现就关掉。充值、公告是页内视窗，不受影响。
 
 排查用（正常玩不需要）:
   --unlock       不锁定云游戏标签页
+  --tabs         显示标签栏与地址栏（窗口模式排查用）
   --keys         恢复被屏蔽的浏览器快捷键
   --dupes        允许出现重复的云游戏页
   --port=N       守护端口（默认随机）

@@ -5,7 +5,7 @@
 #       也可在桌面模式直接运行。
 #
 # 用法:
-#   launch-firefox.sh [--url=URL] [--strict]
+#   launch-firefox.sh [--url=URL] [--fullscreen] [--strict]
 #   环境变量:
 #     DRY_RUN=1                 只打印最终命令，不执行
 #     ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制指定渲染后端
@@ -37,12 +37,14 @@ log() { [ "${ENDFIELD_LOG:-}" = "1" ] || [ -n "${IN_GAMESCOPE:-}" ] || return 0;
 die() { code=$1; shift; echo "[launch-firefox] $*" >&2; log "FATAL($code): $*"; exit "$code"; }
 
 # ---------- 参数解析 ----------
-URL="$DEFAULT_URL"; URL_EXPLICIT=0
+URL="$DEFAULT_URL"; URL_EXPLICIT=0; WIDTH=1280; HEIGHT=800; WINDOW_MODE="auto"
 for arg in "$@"; do
   case "$arg" in
     --url=*)           URL="${arg#--url=}"; URL_EXPLICIT=1 ;;
     # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
     # 对外名字：一个词，讲结果不讲机制
+    --fullscreen)      WINDOW_MODE="fullscreen" ;;
+    --tabs)            export ENDFIELD_SHOW_CHROME=1 ;;
     --strict)          export ENDFIELD_FOCUS=1; export ENDFIELD_BLOCK_JUMPS=1 ;;
     --unlock)          export ENDFIELD_TAB_GUARD=0 ;;
     --keys)            export ENDFIELD_KEY_BLOCK=0 ;;
@@ -51,10 +53,7 @@ for arg in "$@"; do
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
 done
-# 桌面模式没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
-if [ -z "${IN_GAMESCOPE:-}" ]; then
-  echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2
-fi
+case "$WINDOW_MODE" in auto|fullscreen) ;; *) WINDOW_MODE="auto" ;; esac
 # URL 以 -- 开头会被 Firefox 当成启动参数（例如 --kiosk），只接受 http(s)
 case "$URL" in --*) die "$EXIT_PROFILE" "--url 不能以 -- 开头: $URL";; esac
 
@@ -81,7 +80,14 @@ fi
 if [ -n "${GAMESCOPE_WAYLAND_DISPLAY:-}" ]; then IN_GAMESCOPE=1; fi
 case "$WAYLAND_DISPLAY" in gamescope-*) IN_GAMESCOPE=1;; esac
 
-# 一律 kiosk 全屏：这个外壳没有“窗口里看看”的用途
+# 默认行为：游戏模式（gamescope）全屏 kiosk；桌面模式给普通窗口 1280x800
+if [ "$WINDOW_MODE" = "auto" ]; then
+  if [ -n "${IN_GAMESCOPE:-}" ]; then WINDOW_MODE="fullscreen"; else WINDOW_MODE="windowed"; fi
+fi
+# 桌面模式强制全屏时没有 Steam 叠加层：STEAM 菜单出不来，退出只能靠窗口管理器的 Alt+F4
+if [ "$WINDOW_MODE" = "fullscreen" ] && [ -z "${IN_GAMESCOPE:-}" ]; then
+  echo "[launch-firefox] 提示: 桌面模式没有 Steam 叠加层，全屏请先用 Alt+F4 退出（需在 控制器→桌面布局 里绑好）" >&2
+fi
 
 # ---------- Firefox 探测: native 或 flatpak ----------
 FIREFOX_KIND=""; FIREFOX_BIN=""
@@ -123,6 +129,17 @@ sync_profile() {
 }
 if [ "$FIREFOX_KIND" = "flatpak" ] || [ "$FORCE_PROFILE_SYNC" = "1" ]; then
   sync_profile
+  # 排查用：桌面窗口模式下把标签栏和地址栏放回来（kiosk 下本来就没有）
+  if [ "${ENDFIELD_SHOW_CHROME:-0}" = "1" ] && [ "$RUNTIME_PROFILE" != "$REPO_PROFILE_DIR" ]; then
+    cat >> "$RUNTIME_PROFILE/chrome/userChrome.css" <<'CSS'
+
+/* ENDFIELD_SHOW_CHROME=1：临时显示标签栏与地址栏 */
+#titlebar,
+#TabsToolbar,
+#nav-bar { display: revert !important; visibility: visible !important; }
+CSS
+    log "debug: chrome (tab strip + urlbar) shown on request"
+  fi
 else
   RUNTIME_PROFILE="$REPO_PROFILE_DIR"
 fi
@@ -255,7 +272,12 @@ case "$FIREFOX_KIND" in
     ;;
 esac
 
-MODE_ARGS="--kiosk"
+if [ "$WINDOW_MODE" = "fullscreen" ]; then
+  MODE_ARGS="--kiosk"
+else
+  # Firefox 传统 CLI 用单横线的 -width/-height
+  MODE_ARGS="-width $WIDTH -height $HEIGHT"
+fi
 
 RUN_URL="$URL"
 [ -n "$RUN_URL" ] && [ "${RUN_URL#http}" = "$RUN_URL" ] && [ "${RUN_URL#--}" = "$RUN_URL" ] && RUN_URL="https://$RUN_URL"
@@ -271,7 +293,7 @@ if [ "$FIREFOX_KIND" = "flatpak" ]; then
 else
   FINAL_CMD="${FIREFOX_BIN} $FF_ARGS \"$RUNTIME_PROFILE\" $MODE_ARGS${RUN_URL:+ \"$RUN_URL\"}"
 fi
-echo "[launch-firefox] backend=$BACKEND mode=kiosk kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
+echo "[launch-firefox] backend=$BACKEND mode=$WINDOW_MODE kind=$FIREFOX_KIND guard=$GUARD_ACTIVE"
 echo "[launch-firefox] profile=$RUNTIME_PROFILE"
 echo "[launch-firefox] exec: $FINAL_CMD"
 log "exec: $FINAL_CMD"
