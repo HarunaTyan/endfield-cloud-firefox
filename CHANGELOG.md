@@ -2,6 +2,11 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.3.2
+
+- 云游戏页被点进鼠标视角（指针锁定）后，按任意手柄键会立刻释放光标，游戏自己的悬浮面板重新可以点。
+- 新增 `ENDFIELD_POINTER_RELEASE`（默认开启，设 `0` 关闭）。
+
 ## v1.3.1
 
 - CI 增加 `py_compile`、`node tests/tab-guard-logic.mjs`、`tests/status-log.py`，语法检查不再是唯一门槛。

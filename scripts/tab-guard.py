@@ -276,6 +276,7 @@ const DEDUPE = %(dedupe)s;
 const FOCUS = %(focus)s;
 const BLOCK_JUMPS = %(block_jumps)s;
 const NAV_ALLOW = %(nav_allow)s;
+const POINTER_RELEASE = %(pointer_release)s;
 const ONLY_LIST = MODE_ACTION === "list";
 
 let win = null;
@@ -380,6 +381,60 @@ if (!ONLY_LIST && !ST.keyFilter && BLOCKED_KEYS.length) {
     } catch (e) {}
   };
   win.addEventListener("keydown", ST.keyFilter, true);
+}
+
+// ---- 指针锁定：手柄动一下就把光标还回来（幂等）----
+// 点一下画面，云游戏页会请求 pointer lock：光标锁进画布，之后的鼠标位移被当成视角增量。
+// Deck 上退出它的默认办法是 Esc，但这里 Esc 是游戏自己的功能键、屏幕键盘也没有这个键，
+// 锁定期间又点不到游戏自己的悬浮面板，于是卡在键鼠视角里出不来。
+// 判据：只要有任何手柄按键被按下，就释放锁定，把操作权交回手柄。
+// 关掉：ENDFIELD_POINTER_RELEASE=0。
+if (!ONLY_LIST && POINTER_RELEASE) {
+  if (!ST.pointerRelease) {
+    ST.pointerRelease = function () {
+      const out = { locked: false, released: false };
+      try {
+        const tab = gB.selectedTab;
+        const b = tab && tab.linkedBrowser;
+        let w = null;
+        try { w = b && b.contentWindow; } catch (e) {}
+        const pw = w && (w.wrappedJSObject || w);
+        const doc = pw && pw.document;
+        if (!doc || !doc.pointerLockElement) return out;
+        out.locked = true;
+        // 取手柄列表的入口不止一个：页面自己的 navigator 有权限门控，取不到时再退到
+        // 内容窗口、最后退到浏览器的 navigator。任一处能读到按下状态就算数。
+        let pressed = false;
+        const navs = [];
+        try { if (pw.navigator) navs.push(pw.navigator); } catch (e) {}
+        try { if (w.navigator && w.navigator !== pw.navigator) navs.push(w.navigator); } catch (e) {}
+        try {
+          if (typeof navigator !== "undefined" && navigator.getGamepads) navs.push(navigator);
+        } catch (e) {}
+        for (const nav of navs) {
+          if (pressed) break;
+          try {
+            if (typeof nav.getGamepads !== "function") continue;
+            const pads = nav.getGamepads() || [];
+            for (const pad of pads) {
+              if (!pad) continue;
+              for (const btn of pad.buttons || []) {
+                if (btn && (btn.pressed || btn.value > 0.5)) { pressed = true; break; }
+              }
+              if (pressed) break;
+            }
+          } catch (e) {}
+        }
+        if (pressed && doc.exitPointerLock) {
+          doc.exitPointerLock();
+          out.released = true;
+          ST.pointerUnlocked = (ST.pointerUnlocked || 0) + 1;
+        }
+      } catch (e) {}
+      return out;
+    };
+  }
+  ST.pointer = ST.pointerRelease();
 }
 
 // ---- 打补丁：云游戏标签关不掉（幂等）----
@@ -825,6 +880,7 @@ return {
   ambiguous: ambiguous,
   blocked: ST.blocked,
   blockedKeys: ST.blockedKeys || 0,
+  pointerUnlocked: ST.pointerUnlocked || 0,
   respectUser: !!ST.respectUser,
   count: tabs.length,
   activeIndex: gB.tabContainer.selectedIndex,
@@ -879,7 +935,7 @@ def nav_rules(url=None):
 
 def build_script(
     hosts, url, action, block_keys=True, dedupe=True, focus=False,
-    block_jumps=False, nav_allow=None,
+    block_jumps=False, nav_allow=None, pointer_release=True,
 ):
     return JS_TEMPLATE % {
         "hosts": json.dumps(hosts),
@@ -890,6 +946,7 @@ def build_script(
         "block_jumps": "true" if block_jumps else "false",
         "nav_allow": json.dumps(nav_allow or []),
         "blocked_keys": json.dumps(BLOCKED_KEYS if block_keys else []),
+        "pointer_release": "true" if pointer_release else "false",
     }
 
 
@@ -939,9 +996,10 @@ def main(argv=None):
     focus = os.environ.get("ENDFIELD_FOCUS", "0").strip() == "1"
     block_jumps = os.environ.get("ENDFIELD_BLOCK_JUMPS", "0").strip() == "1"
     nav_allow = nav_rules()
+    pointer_release = os.environ.get("ENDFIELD_POINTER_RELEASE", "1").strip() != "0"
     script = build_script(
         hosts, args.url, "list" if action == "list" else action, block_keys, dedupe,
-        focus, block_jumps, nav_allow,
+        focus, block_jumps, nav_allow, pointer_release,
     )
 
     def log(msg):
@@ -1049,7 +1107,7 @@ def main(argv=None):
             want = pending_cmd.get("cmd")
             if want in ("close-strays", "focus-game"):
                 try:
-                    result = parse_status(client.execute(build_script(hosts, args.url, want, block_keys)))
+                    result = parse_status(client.execute(build_script(hosts, args.url, want, block_keys, pointer_release=pointer_release)))
                     last_cmd = {"id": cmd_id, "cmd": want, "result": result}
                     log(
                         "外部命令 %s 完成：标签 %d 个%s"
