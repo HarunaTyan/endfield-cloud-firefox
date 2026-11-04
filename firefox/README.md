@@ -107,7 +107,6 @@ python3 scripts/steam-shortcut.py \
 
 - 页面源码对 UA 含 `firefox` 的浏览器禁用 WLRTC（WebTransport + WebCodecs），Firefox 只能走 **WebRTC H264**；
   H264 可用，但 `powerEfficient=false`，1080p60 有软解/发热风险。
-- 没有 F12 手柄静音注入点；用系统音量/耳机线控。
 - 登录使用官方二维码/手机号，本项目不做绕过。
 - Firefox 版本升级后个别 prefs 可能改名；启动前用 `about:support` 或 `prefs.js` 核对。
 - 标签页守护走 Firefox 内置的 Marionette 协议；Firefox 大版本改动协议时要同步更新 `scripts/tab-guard.py`。
