@@ -5,7 +5,7 @@
 ## v1.3.1
 
 - CI 增加 `py_compile`、`node tests/tab-guard-logic.mjs`、`tests/status-log.py`，语法检查不再是唯一门槛。
-- 修复 `tests/bench-guard.mjs`：占位符补齐后才能真正跑起来，并去掉注释里的本机绝对路径。
+- 修复 `tests/bench-guard.mjs`：占位符补齐后才能真正跑起来，示例路径与项目定位一致。
 - 打开任何页面都能免手势全屏的偏好（`full-screen-api.allow-trusted-requests-only=false`）移除：全屏由 kiosk 负责，这行没有必要留着。
 - 文档修正：`tests/README.md` 小节编号、FUSE 表述区分构建期与运行期、`.github/release.yml` 不再引用已删除的文件。
 
@@ -136,7 +136,7 @@
 
 ## v1.2.0
 
-安全与稳定性整改（外部代码审查的 P1 / P2 项）。
+安全与稳定性整改。
 
 - 标签页守护不再固定监听 2828：每次启动由系统分配空闲端口，并把端口写进运行 profile。
   需要固定端口时用 `ENDFIELD_MARIONETTE_PORT`。

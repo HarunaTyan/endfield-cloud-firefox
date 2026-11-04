@@ -1,5 +1,5 @@
 // 云·终末地 · Firefox profile prefs（云游戏方向）
-// 所有 pref 名均已对本机 Firefox 158.0 (Flatpak) 的 libxul.so / greprefs.js /
+// 所有 pref 名均已对 Firefox 158.0 (Flatpak) 的 libxul.so / greprefs.js /
 // firefox.js 做过字符串核对（2026-10-20）；被移除的 pref 以注释保留并说明。
 // user.js 在每次启动时覆盖 prefs.js 中的同名项；Firefox 退出时会把值写回 prefs.js。
 
