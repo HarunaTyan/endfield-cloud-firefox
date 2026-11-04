@@ -8,19 +8,19 @@
 
 ## 安装
 
-> 已经装过 Firefox 的可以跳过第一步。
+> 已经装过 Firefox 的可以跳过第一步。若安装完毕手柄无反应，见「常见问题」最后一条。
 1. 安装 Firefox：
 
-```sh
-flatpak install -y flathub org.mozilla.firefox
-```
+  ```sh
+  flatpak install -y flathub org.mozilla.firefox
+  ```
 
 2. 从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载 `.AppImage.tar.gz` 并解压（解压后自带执行权限）：
 
-```sh
-cd ~/<目录>
-tar -xzf EndfieldCloud-*.AppImage.tar.gz
-```
+  ```sh
+  cd ~/<目录>
+  tar -xzf EndfieldCloud-*.AppImage.tar.gz
+  ```
 
 3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
 
@@ -53,6 +53,14 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz
 - **我该如何更新？**
 
   从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载新版本，解压覆盖到同一个 `~/<目录>/`，保持文件名不变，Steam 条目不用改。
+
+- **进了游戏，但手柄没有反应？**
+
+  请运行以下命令，确保浏览器获取设备调用权限：
+
+  ```sh
+  flatpak override --user --device=all org.mozilla.firefox
+  ```
 
 ## 声明
 
