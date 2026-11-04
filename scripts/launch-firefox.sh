@@ -141,9 +141,12 @@ if [ "$FIREFOX_KIND" = "flatpak" ] || [ "$FORCE_PROFILE_SYNC" = "1" ]; then
   if [ "${ENDFIELD_SHOW_CHROME:-0}" = "1" ] && [ "$RUNTIME_PROFILE" != "$REPO_PROFILE_DIR" ]; then
     cat >> "$RUNTIME_PROFILE/chrome/userChrome.css" <<'CSS'
 
-/* ENDFIELD_SHOW_CHROME=1：临时把标签栏与地址栏显示出来 */
-#TabsToolbar { display: -moz-box !important; }
-#nav-bar { display: -moz-box !important; }
+/* ENDFIELD_SHOW_CHROME=1：临时把标签栏与地址栏显示出来。
+ * 用 revert 回到浏览器默认样式：userChrome.css 里 #titlebar 也一起被隐藏了，
+ * 只取消 #TabsToolbar 的 display 是没用的；-moz-box 在 158 上已经不是合法值。 */
+#titlebar,
+#TabsToolbar,
+#nav-bar { display: revert !important; visibility: visible !important; }
 CSS
     log "debug: chrome (tab strip + urlbar) shown on request"
   fi

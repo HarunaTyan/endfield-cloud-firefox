@@ -2,6 +2,10 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.12
+
+- 修 `--show-chrome` 不生效：原样式只把 `#TabsToolbar` 设为 `-moz-box`，但 `#titlebar` 仍被隐藏，且 `-moz-box` 在 Firefox 158 已不是合法值。改用 `display: revert`，同时恢复 `#titlebar`。
+
 ## v1.2.11
 
 - 桌面模式用 `--fullscreen` 启动时提示退出方式：那里没有 Steam 叠加层，STEAM 菜单出不来，只能靠 `Alt+F4`。
