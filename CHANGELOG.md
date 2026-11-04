@@ -2,6 +2,11 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.14
+
+- 启动参数改名，按用户看到的结果取名：`--stay`（原 `--block-jumps`）、`--strict`（原 `--focus`）、`--unlock`（原 `--no-guard`）、`--tabs`（原 `--show-chrome`）、`--keys`（原 `--no-key-block`）、`--dupes`（原 `--keep-dupes`）。
+- `--windowed` 不再出现在帮助里（行为保留，供调试）。
+
 ## v1.2.13
 
 - 修 `--block-jumps` 拦不住工具栏「刷新」和地址栏：它们不走页面点击，而是直接调浏览器的加载接口。现在在 `loadURI` / `loadURIWithFlags` / `fixupAndLoadURIString` / `reload` / `reloadWithFlags` 上包一层，非云游戏地址直接吞掉。

@@ -12,22 +12,18 @@ case "${1:-}" in
 云·终末地 · Firefox 外壳（AppImage）
 
 用法:
-  EndfieldCloudFirefox.AppImage [--url=URL] [--window-size=WxH]
-                                [--fullscreen|--windowed]
-                                [--window-mode=auto|fullscreen|windowed]
-                                [--no-guard] [--show-chrome] [--no-key-block]
-                                [--keep-dupes] [--focus] [--block-jumps] [--port=N]
+  EndfieldCloudFirefox.AppImage [--fullscreen] [--stay] [--strict]
 
-启动参数（写在 %command% 之后；单独给也行）:
-  --fullscreen            强制无边框全屏（kiosk）
-  --windowed              强制窗口模式
-  --no-guard              同 ENDFIELD_TAB_GUARD=0
-  --show-chrome           同 ENDFIELD_SHOW_CHROME=1（临时显示标签栏与地址栏）
-  --no-key-block          同 ENDFIELD_KEY_BLOCK=0（放行被拦的快捷键）
-  --keep-dupes            同 ENDFIELD_TAB_DEDUPE=0
-  --focus                 专注模式：云游戏页跳走就拉回，其它标签一律关掉
-  --block-jumps           拦掉页面里指向站外的链接点击（不取消导航，避免掐断登录流程）
-  --port=N                同 ENDFIELD_MARIONETTE_PORT=N
+  --fullscreen   全屏。桌面模式下没有 Steam 叠加层，只能用 Alt+F4 退出。
+  --stay         点了也不离开游戏：站外链接、刷新、地址栏都停在云游戏。
+  --strict       只留游戏（不推荐）。会连客服、反馈这类新标签一起关掉。
+
+排查用（正常玩不需要）:
+  --unlock       不锁定云游戏标签页
+  --tabs         临时显示标签栏与地址栏
+  --keys         恢复被屏蔽的浏览器快捷键
+  --dupes        允许出现重复的云游戏页
+  --port=N       守护端口（默认随机）
 
 环境变量:
   ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制渲染后端
