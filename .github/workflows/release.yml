@@ -21,6 +21,12 @@ jobs:
           sh -n scripts/build-firefox-appimage.sh
           sh -n firefox/appimage/AppRun
 
+      - name: Python and JS checks
+        run: |
+          python3 -m py_compile scripts/tab-guard.py
+          node tests/tab-guard-logic.mjs
+          python3 tests/status-log.py
+
       - name: Build AppImage
         run: sh scripts/build-firefox-appimage.sh
 

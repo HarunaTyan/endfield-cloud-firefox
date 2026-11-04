@@ -34,7 +34,6 @@ user_pref("dom.gamepad.haptic_feedback.enabled", true);
 // ==== 自动播放 / 全屏 ====
 user_pref("media.autoplay.default", 0);
 user_pref("media.autoplay.blocking_policy", 0);
-user_pref("full-screen-api.allow-trusted-requests-only", false);
 // 全屏警告横幅停留时间(ms)。0 = 立即消失（仍会短暂渲染）。
 user_pref("full-screen-api.warning.timeout", 0);
 user_pref("full-screen-api.keyboardlock-warning.timeout", 0);

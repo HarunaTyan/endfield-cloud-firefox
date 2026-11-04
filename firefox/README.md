@@ -95,7 +95,7 @@ DRY_RUN=1 sh scripts/launch-firefox.sh
 sh scripts/build-firefox-appimage.sh
 ```
 
-AppImage 只用 `--appimage-extract-and-run` 兼容无 FUSE 环境；在 Steam Deck 上直接双击/FUSE 也可用。
+构建期用 `--appimage-extract-and-run` 是为了在没有 FUSE 的 CI 环境里跑 appimagetool；运行期分发的 `EndfieldCloud.AppImage` 仍是标准 AppImage，需要 FUSE（缺失时手动 `--appimage-extract` 再跑 AppRun）。
 
 ## 排障开关（只有环境变量形式）
 

@@ -1,6 +1,6 @@
 # GitHub 自动生成 Release 说明的配置（本仓库面向国服，标题用中文）。
 # 说明：Auto-generated notes 的固定小节名（What's Changed / Full Changelog）由 GitHub 决定，
-# 因此正式发版仍要按 docs/PUBLISHING.md 的「发版」步骤用中文说明覆盖一遍。
+# 正式发版时用中文说明覆盖自动生成的内容（`gh release edit --notes-file …`）。
 changelog:
   exclude:
     labels:

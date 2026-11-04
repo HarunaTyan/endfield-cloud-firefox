@@ -1,6 +1,6 @@
 # 离线回归测试
 
-两个测试都不需要 Steam Deck、不需要 Flatpak、不需要真的 Firefox，用来在改代码后先自查一遍。
+下面这几个脚本都不需要 Steam Deck、不需要 Flatpak、不需要真的 Firefox，用来在改代码后先自查一遍。
 
 ## 1. 守护的浏览器侧逻辑
 
@@ -47,7 +47,7 @@ python3 scripts/tab-guard.py --port 2928 --once
 **它验证不了**：Firefox 实际会不会接受这些命令、`gBrowser` 行为是否如预期 ——
 那部分要在机器上用 `python3 scripts/tab-guard.py --list` 自测。
 
-## 3. 启动器
+## 4. 启动器
 
 ```sh
 sh -n scripts/launch-firefox.sh
@@ -57,7 +57,7 @@ DRY_RUN=1 sh scripts/launch-firefox.sh
 
 `DRY_RUN=1` 只打印最终命令、不启动、也不拉起守护。
 
-## 3. 守护的成本
+## 5. 守护的成本
 
 ```sh
 node tests/bench-guard.mjs

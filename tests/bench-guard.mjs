@@ -1,5 +1,5 @@
 // 一次性基准：把 tab-guard.py 的 JS_TEMPLATE 拿出来，用假 gBrowser 跑 N 次，量单次注入成本。
-// 用法：node F:/DSH/.tmp/efcf/tests/bench-guard.mjs
+// 用法：node tests/bench-guard.mjs
 import { readFileSync } from 'node:fs'
 
 const py = readFileSync(new URL('../scripts/tab-guard.py', import.meta.url), 'utf8')
@@ -14,6 +14,11 @@ const script = (action) =>
     .replace('%(hosts)s', JSON.stringify(HOSTS))
     .replace('%(url)s', JSON.stringify(GAME))
     .replace('%(action)s', JSON.stringify(action))
+    .replace('%(blocked_keys)s', '[]')
+    .replace('%(dedupe)s', 'true')
+    .replace('%(focus)s', 'false')
+    .replace('%(block_jumps)s', 'false')
+    .replace('%(nav_allow)s', '[]')
 
 const mkTab = (spec, pinned, label) => ({
   label,
