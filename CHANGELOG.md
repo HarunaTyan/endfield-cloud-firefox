@@ -2,6 +2,11 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.21
+
+- 模式名改回 `--focus`：它现在同时负责拦站外导航与关新标签，一个参数到位。
+- `--strict` 移除。
+
 ## v1.2.20
 
 - 状态里的 `navBlocked`、`focusClosed`、`focusReturned`、`navCancelFailed`、`closed` 改成累计值：以前每轮巡检清零，`--list` 读到的基本永远是 0，看不出有没有拦到东西。
