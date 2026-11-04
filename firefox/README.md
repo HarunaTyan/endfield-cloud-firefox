@@ -35,7 +35,7 @@ DRY_RUN=1 sh scripts/launch-firefox.sh
 ENDFIELD_FIREFOX_BACKEND=x11 sh scripts/launch-firefox.sh
 ```
 
-参数：`--url=URL`（覆盖起始页）、`--strict`（只留游戏）。启动一律全屏 kiosk。
+参数只有两个：`--fullscreen`（桌面模式强制全屏）、`--focus`（专注模式）。
 
 启动即 kiosk；检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
 → XWayland + `--kiosk`；否则 → Wayland + 1280×800 窗口。
@@ -96,3 +96,14 @@ sh scripts/build-firefox-appimage.sh
 ```
 
 AppImage 只用 `--appimage-extract-and-run` 兼容无 FUSE 环境；在 Steam Deck 上直接双击/FUSE 也可用。
+
+## 排障开关（只有环境变量形式）
+
+| 变量 | 作用 |
+|---|---|
+| `ENDFIELD_TAB_GUARD=0` | 不启动标签页守护 |
+| `ENDFIELD_KEY_BLOCK=0` | 放行被屏蔽的浏览器快捷键 |
+| `ENDFIELD_TAB_DEDUPE=0` | 允许多个云游戏页共存 |
+| `ENDFIELD_SHOW_CHROME=1` | 窗口模式下显示标签栏与地址栏 |
+| `ENDFIELD_MARIONETTE_PORT=N` | 固定守护端口 |
+| `ENDFIELD_NAV_ALLOW=/a,/b` | 额外放行的同站路径 |

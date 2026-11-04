@@ -5,7 +5,7 @@
 #       也可在桌面模式直接运行。
 #
 # 用法:
-#   launch-firefox.sh [--url=URL] [--fullscreen] [--strict]
+#   launch-firefox.sh [--fullscreen] [--focus]
 #   环境变量:
 #     DRY_RUN=1                 只打印最终命令，不执行
 #     ENDFIELD_FIREFOX_BACKEND=wayland|x11   强制指定渲染后端
@@ -40,22 +40,15 @@ die() { code=$1; shift; echo "[launch-firefox] $*" >&2; log "FATAL($code): $*"; 
 URL="$DEFAULT_URL"; URL_EXPLICIT=0; WIDTH=1280; HEIGHT=800; WINDOW_MODE="auto"
 for arg in "$@"; do
   case "$arg" in
-    --url=*)           URL="${arg#--url=}"; URL_EXPLICIT=1 ;;
-    # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
-    # 对外名字：一个词，讲结果不讲机制
     --fullscreen)      WINDOW_MODE="fullscreen" ;;
-    --tabs)            export ENDFIELD_SHOW_CHROME=1 ;;
     --focus)           export ENDFIELD_FOCUS=1; export ENDFIELD_BLOCK_JUMPS=1 ;;
-    --unlock)          export ENDFIELD_TAB_GUARD=0 ;;
-    --keys)            export ENDFIELD_KEY_BLOCK=0 ;;
-    --dupes)           export ENDFIELD_TAB_DEDUPE=0 ;;
-    --port=*)          export ENDFIELD_MARIONETTE_PORT="${arg#--port=}" ;;
+    # 其余开关只保留环境变量形式（排障用，不进帮助、不进 README）：
+    #   ENDFIELD_TAB_GUARD=0  ENDFIELD_KEY_BLOCK=0  ENDFIELD_TAB_DEDUPE=0
+    #   ENDFIELD_SHOW_CHROME=1  ENDFIELD_MARIONETTE_PORT=N  ENDFIELD_NAV_ALLOW=/x,/y
     *) echo "[launch-firefox] 忽略未知参数: $arg" >&2 ;;
   esac
 done
 case "$WINDOW_MODE" in auto|fullscreen) ;; *) WINDOW_MODE="auto" ;; esac
-# URL 以 -- 开头会被 Firefox 当成启动参数（例如 --kiosk），只接受 http(s)
-case "$URL" in --*) die "$EXIT_PROFILE" "--url 不能以 -- 开头: $URL";; esac
 
 # ---------- Steam 游戏模式环境兜底（必须在 auto 判定之前）----------
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
