@@ -18,8 +18,8 @@ flatpak install -y flathub org.mozilla.firefox
 2. 从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载 `.AppImage.tar.gz` 并解压（解压后自带执行权限）：
 
 ```sh
-mkdir -p ~/Applications
-tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
+cd ~/<目录>
+tar -xzf EndfieldCloud-*.AppImage.tar.gz
 ```
 
 3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
@@ -49,7 +49,7 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
 - **文件名可以修改吗？**
 
-  可以，但需同步在 Steam 中修改 属性 - 快捷方式 - 目标 中记录的文件名。
+  可以，但需同步在 Steam 中修改 属性 → 快捷方式 → 目标 中记录的文件名。
 
 - **为何位于 其他设备 / 平台 的 Steam 库中也出现了我在Steam Deck上添加的程序？**
 
@@ -57,7 +57,7 @@ tar -xzf EndfieldCloud-*.AppImage.tar.gz -C ~/Applications
 
 - **我该如何更新？**
 
-  从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载新版本，覆盖 `~/Applications/EndfieldCloud.AppImage` 。
+  从 [Releases](https://github.com/HarunaTyan/endfield-cloud-firefox/releases/latest) 下载新版本，解压覆盖到同一个 `~/<目录>/`，保持文件名不变，Steam 条目不用改。
 
 ## 声明
 
