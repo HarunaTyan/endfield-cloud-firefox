@@ -701,6 +701,26 @@ function installNavBlocker() {
   return true;
 }
 
+// 新标签也要拦：页面里的外跳走的是 window.open(..., "_blank")，
+// 它最终落在 gBrowser.addTab 上，所以在这一层拒绝比事后关掉更快、也不会闪一下。
+function wrapAddTab() {
+  if (ST.addTabWrapped) return true;
+  if (typeof gB.addTab !== "function") return false;
+  ST.addTabWrapped = true;
+  const orig = gB.addTab;
+  gB.addTab = function (uri, params, index) {
+    let spec = null;
+    if (typeof uri === "string") spec = uri;
+    else if (uri && uri.spec) spec = uri.spec;
+    if (spec && !navAllowed(spec)) {
+      navBlocked += 1;
+      return null;   // 调用方（window.open）会退回 location.assign，那一层同样被拦
+    }
+    return orig.call(gB, uri, params, index);
+  };
+  return true;
+}
+
 function installLoadGuards() {
   let n = 0;
   for (const t of Array.from(gB.tabs)) {
@@ -742,6 +762,7 @@ let loadGuards = 0;
 if (BLOCK_JUMPS && MODE_ACTION !== "list") {
   installNavBlocker();
   loadGuards = installLoadGuards();
+  wrapAddTab();
 }
 clouds = cloudTabs();
 game = clouds.length ? clouds[clouds.length - 1] : game;

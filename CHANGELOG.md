@@ -2,6 +2,11 @@
 
 本文件是**中文**变更记录，Release 说明以这里的条目为准。版本号与 tag 一致（`vX.Y.Z`）。
 
+## v1.2.15
+
+- `--stay` 补上新标签：页面里的外跳是 `window.open(..., "_blank")`，最终落在 `gBrowser.addTab` 上。现在在这一层拒绝站外地址，客服、反馈这类“新标签 + 切走”也会被原地拦掉。
+- 页面 `window.open` 拿到 null 后会退回 `location.assign`，那一层同样被拦，所以不会因此跳走。
+
 ## v1.2.14
 
 - 启动参数改名，按用户看到的结果取名：`--stay`（原 `--block-jumps`）、`--strict`（原 `--focus`）、`--unlock`（原 `--no-guard`）、`--tabs`（原 `--show-chrome`）、`--keys`（原 `--no-key-block`）、`--dupes`（原 `--keep-dupes`）。

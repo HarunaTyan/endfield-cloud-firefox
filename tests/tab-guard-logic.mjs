@@ -439,6 +439,19 @@ function check(name, cond, detail = "") {
   check("jumps.load-allowed", b.loadedTo.length === 1, "loaded=" + JSON.stringify(b.loadedTo));
 }
 
+// 9d6) 禁止跳转：新标签（window.open 走的 addTab）也要被拒
+{
+  const gB = mkBrowser([mkTab(GAME, true)], 0);
+  gB.addTabsProgressListener = () => {};
+  run("once", gB, null, { blockJumps: true });
+  const before = gB.tabs.length;
+  const t1 = gB.addTab("https://example.com/support");   // 站外：应被拒
+  const t2 = gB.addTab(GAME);                            // 站内：应放行
+  check("jumps.newtab-blocked", t1 === null && gB.tabs.length === before + 1,
+    "t1=" + String(t1) + " tabs=" + gB.tabs.length);
+  check("jumps.newtab-allowed", t2 !== null, "t2=" + String(t2));
+}
+
 // 9e) 专注模式关闭时：别的标签照旧保留
 {
   const gB = mkBrowser([mkTab(GAME, true), mkTab(STRAY)], 1);
