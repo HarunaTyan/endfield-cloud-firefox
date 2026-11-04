@@ -22,7 +22,7 @@
   tar -xzf EndfieldCloud-*.AppImage.tar.gz
   ```
 
-3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/Applications/EndfieldCloud.AppImage`。
+3. 桌面模式 → 库 → 添加非 Steam 游戏 → 选择 `~/<目录>/EndfieldCloud.AppImage`。
 
 ## 启动参数（可选）
 - `--fullscreen` 全屏模式
