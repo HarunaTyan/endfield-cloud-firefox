@@ -48,8 +48,7 @@ for arg in "$@"; do
     --window-mode=*)   WINDOW_MODE="${arg#--window-mode=}" ;;
     # 与环境变量等价的开关：Steam 的启动选项里免去 %command% 才不会踩坑
     # 对外名字：一个词，讲结果不讲机制
-    --stay)            export ENDFIELD_BLOCK_JUMPS=1 ;;
-    --strict)          export ENDFIELD_FOCUS=1 ;;
+    --strict)          export ENDFIELD_FOCUS=1; export ENDFIELD_BLOCK_JUMPS=1 ;;
     --unlock)          export ENDFIELD_TAB_GUARD=0 ;;
     --tabs)            export ENDFIELD_SHOW_CHROME=1 ;;
     --keys)            export ENDFIELD_KEY_BLOCK=0 ;;
@@ -220,7 +219,7 @@ start_tab_guard() {
   if [ "$GUARD_ENABLED" != "1" ]; then
     log "tab-guard: disabled (ENDFIELD_TAB_GUARD=0)"
     if [ "${ENDFIELD_FOCUS:-0}" = "1" ] || [ "${ENDFIELD_BLOCK_JUMPS:-0}" = "1" ]; then
-      log "注意: --strict / --stay 由标签页守护执行，守护关掉后这两个功能不会生效"
+      log "注意: --strict 由标签页守护执行，守护关掉后它不会生效"
     fi
     return 0
   fi

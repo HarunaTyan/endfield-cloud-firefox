@@ -740,6 +740,28 @@ function tabOf(browser) {
 
 let focusReturned = 0;
 let focusClosed = 0;
+// 严格模式：新标签一出现就关掉，不等下一次巡检。
+// 页面外跳走 window.open，TabOpen 事件会先到，这里立刻判一次。
+function installTabClosing() {
+  if (ST.tabCloseHandler) return true;
+  const cont = gB.tabContainer;
+  if (!cont || typeof cont.addEventListener !== "function") return false;
+  ST.tabCloseHandler = (ev) => {
+    try {
+      const t = ev.target;
+      if (!t || t === game || t === ST.protectedTab) return;
+      const b = t.linkedBrowser;
+      const spec = b && b.currentURI ? b.currentURI.spec : null;
+      // about:blank 说明地址还没设好，交给下一轮巡检；已带地址的直接判
+      if (!spec || spec === "about:blank") return;
+      if (isGame(t)) return;
+      if (hardRemove(t)) focusClosed += 1;
+    } catch (e) {}
+  };
+  cont.addEventListener("TabOpen", ST.tabCloseHandler);
+  return true;
+}
+
 function focusPass() {
   if (!FOCUS || MODE_ACTION === "list") return;
   const guard = ST.protectedTab || game;
@@ -758,6 +780,7 @@ function focusPass() {
   }
 }
 focusPass();
+if (FOCUS && MODE_ACTION !== "list") installTabClosing();
 let loadGuards = 0;
 if (BLOCK_JUMPS && MODE_ACTION !== "list") {
   installNavBlocker();
