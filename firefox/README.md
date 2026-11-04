@@ -40,6 +40,35 @@ ENDFIELD_FIREFOX_BACKEND=x11 sh scripts/launch-firefox.sh
 启动即 kiosk；检测到 gamescope（`GAMESCOPE_WAYLAND_DISPLAY` 或 `WAYLAND_DISPLAY=gamescope-*`）
 → XWayland + `--kiosk`；否则 → Wayland + 1280×800 窗口。
 
+## 版本号与启动提示
+
+版本号只有一处来源：构建时把 `$VERSION` 写进包内 `usr/share/endfield-firefox/version`，
+运行期 `firefox/appimage/AppRun` 与 `scripts/launch-firefox.sh` 读同一个文件。
+仓库直跑（没走构建）时包内没有该文件，版本为空、也不弹通知。
+
+```sh
+./EndfieldCloud.AppImage --version
+# Endfield Cloud for Steam Deck with Firefox v1.3.8
+```
+
+启动时另外做两件事：
+
+- 标准输出与 `launch-firefox.log` 各写一行 `version=1.3.8`（`unknown` 表示没走构建）；
+- 发一条桌面通知 `Endfield Cloud for Steam Deck with Firefox / v1.3.8`：
+  `-u low`、`-t 1200`、带 `suppress-sound` 提示位，**后台发起**，DBus 出问题也不会拖住启动。
+
+桌面模式可见；**游戏模式（gamescope）下通常看不到**——那是 Steam 覆盖层的地盘，
+用 `--version` 或日志确认版本。想彻底关掉：`ENDFIELD_VERSION_NOTIFY=0`。
+
+通知的响度与静音不归本项目管，由桌面环境的通知服务决定：KDE → 系统设置 → 通知 →
+应用 → `EndfieldCloud`（通知里的 `-a` 名）。要换提示音或彻底静音都在那里改。
+
+发版流程：改 `scripts/build-firefox-appimage.sh` 的 `VERSION` 默认值与 `CHANGELOG.md`，
+提交后打 tag `vX.Y.Z` 并 push——CI 会构建并上传 Release 附件。
+
+更新到新版：下载 `EndfieldCloud-<版本>.AppImage.tar.gz` → 解压 → 覆盖同目录的同名
+`EndfieldCloud.AppImage`（保持文件名不变，Steam 条目不用改；tar.gz 保留可执行位）。
+
 ## 加进 Steam
 
 1. 在桌面模式运行 `sh scripts/install-firefox-shell.sh`，确认 Flatpak Firefox 与 `devices=all` 正常。
@@ -82,6 +111,11 @@ python3 scripts/steam-shortcut.py \
 - 登录使用官方二维码/手机号，本项目不做绕过。
 - Firefox 版本升级后个别 prefs 可能改名；启动前用 `about:support` 或 `prefs.js` 核对。
 - 标签页守护走 Firefox 内置的 Marionette 协议；Firefox 大版本改动协议时要同步更新 `scripts/tab-guard.py`。
+- **云端起哪种客户端由「开始游戏」那一下的输入类型决定**：页面在按钮的 `pointerdown` 记 `pointerType`，
+  `mouse` → 端游客户端（有手柄/键鼠两套），`touch` → 移动端客户端（只有触控，且不会再切回键鼠）。
+  判定只发生一次，之后的加载界面不参与；浏览器侧改不了，只能改变"点击时用的是鼠标还是触屏"。
+- **指针锁一丢失，页面会在 200 ms 后自己补发一次 Esc**（`enableReplenishEsc` 默认 `true`，只在悬浮菜单收起时触发）。
+  所以从外部 `exitPointerLock()` 显示光标，一定会被游戏当成按了 Esc；「一锁就放」的方案因此不可行。
 
 ## 验证
 
@@ -93,6 +127,7 @@ python3 -m py_compile scripts/tab-guard.py
 node tests/tab-guard-logic.mjs          # 守护的浏览器侧逻辑（不需要 Firefox）
 DRY_RUN=1 sh scripts/launch-firefox.sh
 sh scripts/build-firefox-appimage.sh
+./dist/EndfieldCloud.AppImage --version   # 打印版本，确认 version 文件进了包
 ```
 
 构建期用 `--appimage-extract-and-run` 是为了在没有 FUSE 的 CI 环境里跑 appimagetool；运行期分发的 `EndfieldCloud.AppImage` 仍是标准 AppImage，需要 FUSE（缺失时手动 `--appimage-extract` 再跑 AppRun）。
@@ -107,3 +142,5 @@ sh scripts/build-firefox-appimage.sh
 | `ENDFIELD_SHOW_CHROME=1` | 窗口模式下显示标签栏与地址栏 |
 | `ENDFIELD_MARIONETTE_PORT=N` | 固定守护端口 |
 | `ENDFIELD_NAV_ALLOW=/a,/b` | 额外放行的同站路径 |
+| `ENDFIELD_VERSION_NOTIFY=0` | 不在启动时弹出显示版本的通知（日志里仍写 `version=`） |
+| `ENDFIELD_VERSION=1.3.9` | 覆盖版本号（构建与直跑都生效，一般不设） |
